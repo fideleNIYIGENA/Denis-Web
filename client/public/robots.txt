@@ -1,0 +1,5 @@
+# Denis Ndayishimiye — robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://your-domain.com/sitemap.xml

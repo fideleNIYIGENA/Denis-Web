@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-slate-800 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  .dark body {
+    @apply bg-night text-slate-200;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+  }
+
+  ::selection {
+    @apply bg-gold text-black;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300 dark:bg-night-500;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .glass {
+    @apply border border-white/10 bg-white/10 backdrop-blur-md;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-gold-gradient px-6 py-3 text-sm font-semibold text-night shadow-glow transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-gold/60 disabled:opacity-50;
+  }
+
+  .btn-royal {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-night transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-royal/60 disabled:opacity-50;
+    background-image: linear-gradient(135deg, #d9f99d 0%, #a3e635 45%, #65a30d 100%);
+    box-shadow: 0 0 45px rgba(163, 230, 53, 0.35);
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 disabled:opacity-50;
+  }
+
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-card transition dark:border-white/10 dark:bg-night-700 dark:shadow-card-dark;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 transition focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/30 dark:border-white/10 dark:bg-night-800 dark:text-white;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .skeleton {
+    @apply animate-shimmer rounded bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:600px_100%] dark:from-night-600 dark:via-night-500 dark:to-night-600;
+  }
+
+  .text-gradient {
+    @apply bg-gold-gradient bg-clip-text text-transparent;
+  }
+
+  .text-royal-gradient {
+    background-image: linear-gradient(135deg, #d9f99d 0%, #a3e635 45%, #65a30d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
