@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
+import { FaMobileScreenButton, FaCreditCard } from 'react-icons/fa6';
 import api from '../api/client.js';
 import { useToast } from './components/Toast.jsx';
 import FormField from './components/FormField.jsx';
@@ -17,6 +18,129 @@ const EDITABLE_FIELDS = [
   'about_summary',
   'contact_address',
 ];
+
+const PAYMENT_OPTIONS = [
+  { key: 'mobile_money', label: 'Mobile Money', icon: FaMobileScreenButton, hint: 'Accept payments via MTN / Airtel Mobile Money' },
+  { key: 'card', label: 'Card', icon: FaCreditCard, hint: 'Accept debit / credit card payments' },
+];
+
+function PaymentSettingsSection({ show }) {
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .get('/admin/settings/payment-methods')
+      .then((res) => setForm(res.data.data))
+      .catch(() => show('Could not load payment settings.', 'error'));
+  }, [show]);
+
+  if (!form) return <Loader />;
+
+  const toggleMethod = (key) => {
+    setForm((f) => {
+      const has = f.payment_methods.includes(key);
+      const next = has ? f.payment_methods.filter((m) => m !== key) : [...f.payment_methods, key];
+      return { ...f, payment_methods: next };
+    });
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (form.payment_methods.length === 0) return show('Enable at least one payment method.', 'error');
+    setSaving(true);
+    try {
+      await api.put('/admin/settings/payment-methods', {
+        payment_methods: form.payment_methods,
+        momo_number: form.momo_number,
+        momo_merchant_code: form.momo_merchant_code,
+        subscription_price: Number(form.subscription_price) || 0,
+      });
+      show('Payment settings updated successfully.');
+    } catch (err) {
+      show(err.response?.data?.message || 'Could not save payment settings.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} className="card p-6 sm:p-8">
+      <div className="mb-6">
+        <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white">Payment Settings</h3>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Choose which payment methods visitors can use to subscribe, buy tracks or book event tickets.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {PAYMENT_OPTIONS.map(({ key, label, icon: Icon, hint }) => {
+          const enabled = form.payment_methods.includes(key);
+          return (
+            <label
+              key={key}
+              className={`flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 transition ${
+                enabled ? 'border-gold bg-gold/10' : 'border-slate-300 dark:border-white/10'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={() => toggleMethod(key)}
+                className="h-4 w-4 accent-gold"
+              />
+              <Icon className={`h-5 w-5 ${enabled ? 'text-gold' : 'text-slate-400'}`} />
+              <span className="flex-1">
+                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">{hint}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {form.payment_methods.includes('mobile_money') && (
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <FormField label="MoMo Payout Phone Number" hint="Shown to visitors as the number to send payment to.">
+            <input
+              value={form.momo_number || ''}
+              onChange={(e) => setForm((f) => ({ ...f, momo_number: e.target.value }))}
+              className="input"
+              placeholder="e.g. +250 7xx xxx xxx"
+            />
+          </FormField>
+          <FormField label="MoMo Merchant Code">
+            <input
+              value={form.momo_merchant_code || ''}
+              onChange={(e) => setForm((f) => ({ ...f, momo_merchant_code: e.target.value }))}
+              className="input"
+              placeholder="Merchant / paybill code (optional)"
+            />
+          </FormField>
+        </div>
+      )}
+
+      <div className="mt-6 max-w-sm">
+        <FormField label="Subscription Price (RWF)" hint="Price for 30 days of full-access listening.">
+          <input
+            type="number"
+            min="0"
+            step="100"
+            value={form.subscription_price ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, subscription_price: e.target.value }))}
+            className="input"
+          />
+        </FormField>
+      </div>
+
+      <div className="mt-8 flex justify-end">
+        <button type="submit" disabled={saving} className="btn-primary">
+          <FiSave className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Payment Settings'}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function AdminSettings() {
   const { show } = useToast();
@@ -139,6 +263,8 @@ export default function AdminSettings() {
           </button>
         </div>
       </form>
+
+      <PaymentSettingsSection show={show} />
     </div>
   );
 }

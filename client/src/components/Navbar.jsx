@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FiMenu, FiX, FiMoon, FiSun, FiMusic } from 'react-icons/fi';
+import { FaCrown } from 'react-icons/fa6';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import CheckoutModal from './CheckoutModal.jsx';
 
 const LINKS = [
   { to: '/', label: 'Home' },
@@ -20,6 +22,7 @@ export default function Navbar() {
   const { dark, toggle } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -37,7 +40,8 @@ export default function Navbar() {
   const transparent = pathname === '/' && !scrolled && !open;
 
   return (
-    <header
+    <>
+      <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
         transparent
           ? 'bg-transparent'
@@ -82,6 +86,15 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2">
+          {/* Subscribe (guest checkout, no account needed) */}
+          <button
+            type="button"
+            onClick={() => setSubOpen(true)}
+            className="hidden items-center gap-2 rounded-full bg-gold-gradient px-4 py-2 text-sm font-semibold text-night shadow-glow transition hover:brightness-110 lg:inline-flex"
+          >
+            <FaCrown className="h-3.5 w-3.5" /> Subscribe
+          </button>
+
           {/* Theme toggle */}
           <button
             type="button"
@@ -125,6 +138,19 @@ export default function Navbar() {
             className="overflow-hidden border-b border-white/10 bg-white/95 backdrop-blur-xl dark:bg-night/95 xl:hidden"
           >
             <ul className="container-x flex flex-col gap-1 py-4">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubOpen(true);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-night"
+                >
+                  <FaCrown className="h-4 w-4" />
+                  Subscribe
+                </button>
+              </li>
               {LINKS.map((link) => (
                 <li key={link.to}>
                   <NavLink
@@ -147,6 +173,9 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+      </header>
+
+      <CheckoutModal open={subOpen} onClose={() => setSubOpen(false)} type="subscription" />
+    </>
   );
 }

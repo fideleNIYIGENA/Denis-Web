@@ -54,6 +54,16 @@ export default function VideosPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Opening a video starts playback: record the view server-side and bump the
+  // local counter so the card reflects it immediately.
+  const openVideo = (video) => {
+    setPlaying(video);
+    api.post(`/videos/${video.id}/view`).catch(() => {});
+    setVideos((list) =>
+      list.map((v) => (v.id === video.id ? { ...v, view_count: (v.view_count || 0) + 1 } : v))
+    );
+  };
+
   return (
     <>
       <PageHeader
@@ -102,7 +112,7 @@ export default function VideosPage() {
           ) : videos.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {videos.map((video, i) => (
-                <VideoCard key={video.id} video={video} index={i} onPlay={setPlaying} />
+                <VideoCard key={video.id} video={video} index={i} onPlay={openVideo} />
               ))}
             </div>
           ) : (

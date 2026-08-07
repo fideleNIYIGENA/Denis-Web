@@ -1,6 +1,7 @@
-import { FaPlay, FaStar } from 'react-icons/fa6';
+import { FaPlay, FaStar, FaEye } from 'react-icons/fa6';
 import { motion } from 'framer-motion';
 import LazyImage from './LazyImage.jsx';
+import { formatNumber } from '../lib/format.js';
 
 export function formatDuration(seconds) {
   if (!seconds) return null;
@@ -48,6 +49,9 @@ export default function VideoCard({ video, index = 0, onPlay }) {
             {formatDuration(video.duration)}
           </span>
         )}
+        <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">
+          <FaEye className="h-3 w-3 text-gold" /> {formatNumber(video.view_count)}
+        </span>
       </div>
 
       <div className="p-5">

@@ -9,6 +9,8 @@ import socialRoutes from './socialLinks.routes.js';
 import messageRoutes from './messages.routes.js';
 import settingsRoutes from './settings.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import paymentRoutes from './payments.routes.js';
+import adminRoutes from './admin.routes.js';
 
 const router = Router();
 
@@ -24,5 +26,7 @@ router.use('/social-links', socialRoutes);
 router.use('/messages', messageRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

@@ -15,6 +15,7 @@ const EMPTY = {
   description: '',
   registration_link: '',
   status: 'upcoming',
+  ticket_price: '',
 };
 
 export default function AdminEvents() {
@@ -68,6 +69,7 @@ export default function AdminEvents() {
       description: ev.description || '',
       registration_link: ev.registration_link || '',
       status: ev.status || 'upcoming',
+      ticket_price: ev.ticket_price ?? '',
     });
     setPosterFile(null);
     setModalOpen(true);
@@ -83,16 +85,26 @@ export default function AdminEvents() {
     setSaving(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, String(v ?? '')));
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === 'ticket_price') return; // saved via the pricing endpoint
+        fd.append(k, String(v ?? ''));
+      });
       if (posterFile) fd.append('poster', posterFile);
 
+      let eventId = editing?.id;
       if (editing) {
         await api.put(`/events/${editing.id}`, fd);
         show('Event updated successfully.');
       } else {
-        await api.post('/events', fd);
+        const res = await api.post('/events', fd);
+        eventId = res.data.data.id;
         show('Event created successfully.');
       }
+
+      await api.put(`/admin/events/${eventId}/pricing`, {
+        ticket_price: Number(form.ticket_price) || 0,
+      });
+
       setModalOpen(false);
       fetchEvents();
     } catch (err) {
@@ -161,7 +173,8 @@ export default function AdminEvents() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {ev.event_date || 'No date'} {ev.venue ? `• ${ev.venue}` : ''}
+                    {ev.event_date || 'No date'} {ev.venue ? `• ${ev.venue}` : ''}{' '}
+                    {Number(ev.ticket_price) > 0 ? `• RWF ${Number(ev.ticket_price).toLocaleString()} ticket` : ''}
                   </p>
                 </div>
               </div>
@@ -198,8 +211,8 @@ export default function AdminEvents() {
               <textarea name="description" rows={3} value={form.description} onChange={setField} className="input resize-y" />
             </FormField>
           </div>
-          <FormField label="Registration Link" hint="Optional ticketing or registration URL.">
-            <input name="registration_link" value={form.registration_link} onChange={setField} className="input" placeholder="https://…" />
+          <FormField label="Ticket Price (RWF)" hint="Set 0 for free entry.">
+            <input name="ticket_price" type="number" min="0" step="500" value={form.ticket_price} onChange={setField} className="input" />
           </FormField>
           <FormField label="Status">
             <select name="status" value={form.status} onChange={setField} className="input">
@@ -207,6 +220,11 @@ export default function AdminEvents() {
               <option value="past">Past</option>
             </select>
           </FormField>
+          <div className="sm:col-span-2">
+            <FormField label="Registration Link" hint="Optional ticketing or registration URL.">
+              <input name="registration_link" value={form.registration_link} onChange={setField} className="input" placeholder="https://…" />
+            </FormField>
+          </div>
           <div className="sm:col-span-2">
             <FormField label="Poster Image" hint="JPG, PNG or WebP. Max 8 MB.">
               <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files?.[0] || null)} className="input file:mr-3 file:rounded-full file:border-0 file:bg-gold/15 file:px-4 file:py-1 file:text-sm file:font-semibold file:text-gold" />

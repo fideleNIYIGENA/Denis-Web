@@ -39,6 +39,9 @@ create table if not exists public.songs (
   audiomack_url    text,
   youtube_url      text,
   download_url     text,
+  price            numeric(12,2) not null default 0,   -- 0 = free listening
+  is_free          boolean not null default true,
+  play_count       integer not null default 0,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -56,6 +59,7 @@ create table if not exists public.videos (
   duration      integer not null default 0,        -- seconds
   is_short      boolean not null default false,    -- shorts limited to 60s
   featured      boolean not null default false,
+  view_count    integer not null default 0,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   constraint videos_short_duration_check check (not (is_short = true and duration > 60))
@@ -85,6 +89,7 @@ create table if not exists public.events (
   description        text,
   poster_url         text,
   registration_link  text,
+  ticket_price       numeric(12,2) not null default 0,
   status             text not null default 'upcoming'
                      constraint events_status_check check (status in ('upcoming', 'past')),
   created_at         timestamptz not null default now(),
@@ -168,6 +173,10 @@ create table if not exists public.settings (
   hero_video_url  text default '',
   about_summary   text default '',
   contact_address text default '',
+  payment_methods    jsonb not null default '["mobile_money","card"]',
+  momo_number        text,
+  momo_merchant_code text,
+  subscription_price numeric(12,2) not null default 5000,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
@@ -222,6 +231,61 @@ create index if not exists idx_messages_created  on public.messages (created_at 
 create index if not exists idx_subscribers_email on public.subscribers (email);
 
 -- ---------------------------------------------------------------------------
+-- 11. PAYMENTS  (guest checkout: subscriptions, track purchases, event tickets)
+-- ---------------------------------------------------------------------------
+create table if not exists public.payments (
+  id             uuid primary key default gen_random_uuid(),
+  payer_email    text not null,
+  payer_phone    text,
+  payment_method text not null
+                 constraint payments_method_check check (payment_method in ('mobile_money', 'card')),
+  amount         numeric(12,2) not null default 0,
+  type           text not null
+                 constraint payments_type_check check (type in ('subscription', 'track_buy', 'event_ticket')),
+  item_id        uuid,                                  -- track or event purchased
+  access_token   text not null unique,                  -- unlocks content on the buyer's device
+  expires_at     timestamptz,                           -- set for subscriptions
+  status         text not null default 'completed'
+                 constraint payments_status_check check (status in ('completed', 'pending', 'failed')),
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists idx_payments_email   on public.payments (payer_email);
+create index if not exists idx_payments_type    on public.payments (type);
+create index if not exists idx_payments_status  on public.payments (status);
+create index if not exists idx_payments_item    on public.payments (item_id);
+create index if not exists idx_payments_created on public.payments (created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- 12. IDEMPOTENT MIGRATIONS — safe to re-run on existing deployments.
+-- ---------------------------------------------------------------------------
+alter table public.settings add column if not exists payment_methods    jsonb not null default '["mobile_money","card"]';
+alter table public.settings add column if not exists momo_number        text;
+alter table public.settings add column if not exists momo_merchant_code text;
+alter table public.settings add column if not exists subscription_price numeric(12,2) not null default 5000;
+
+alter table public.songs add column if not exists price      numeric(12,2) not null default 0;
+alter table public.songs add column if not exists is_free    boolean not null default true;
+alter table public.songs add column if not exists play_count integer not null default 0;
+
+alter table public.videos add column if not exists view_count integer not null default 0;
+
+alter table public.events add column if not exists ticket_price numeric(12,2) not null default 0;
+
+-- ---------------------------------------------------------------------------
+-- 13. ATOMIC COUNTERS — safe single-statement increments for play/view stats.
+-- ---------------------------------------------------------------------------
+create or replace function public.increment_song_play(song_id uuid)
+returns integer language sql security definer as $$
+  update public.songs set play_count = coalesce(play_count, 0) + 1 where id = song_id returning play_count;
+$$;
+
+create or replace function public.increment_video_view(video_id uuid)
+returns integer language sql security definer as $$
+  update public.videos set view_count = coalesce(view_count, 0) + 1 where id = video_id returning view_count;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- RLS — service role bypasses RLS, but we disable it explicitly so the
 -- app keeps working even if a less-privileged key is used by accident.
 -- ---------------------------------------------------------------------------
@@ -235,6 +299,7 @@ alter table public.social_links   disable row level security;
 alter table public.messages       disable row level security;
 alter table public.subscribers    disable row level security;
 alter table public.settings       disable row level security;
+alter table public.payments       disable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Seed the singleton rows so GET endpoints always have data.

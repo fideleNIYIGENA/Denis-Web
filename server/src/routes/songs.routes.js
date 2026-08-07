@@ -8,6 +8,7 @@ import {
   updateSong,
   deleteSong,
 } from '../controllers/songs.controller.js';
+import { verifyAccess, incrementPlay } from '../controllers/payments.controller.js';
 import { authRequired } from '../middleware/auth.js';
 import { songUpload } from '../utils/upload.js';
 
@@ -22,6 +23,9 @@ router.get('/', listSongs);
 router.get('/featured', listFeatured);
 router.get('/genres', listGenres);
 router.get('/:id', getSong);
+
+router.post('/:id/verify-access', verifyAccess);
+router.post('/:id/play', incrementPlay);
 
 router.post('/', authRequired, multipart, createSong);
 router.put('/:id', authRequired, multipart, updateSong);

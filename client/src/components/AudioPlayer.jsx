@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FiPause, FiPlay } from 'react-icons/fi';
+import { FiPause, FiPlay, FiLock } from 'react-icons/fi';
 
 function format(seconds) {
   if (!Number.isFinite(seconds)) return '0:00';
@@ -8,8 +8,13 @@ function format(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** Accessible audio player with play/pause, seek bar and time display. */
-export default function AudioPlayer({ src, title = 'Song preview' }) {
+/**
+ * Accessible audio player with play/pause, seek bar and time display.
+ * - `locked`: playback is gated behind a purchase/subscription. Clicking play
+ *   fires `onLocked` instead of starting the audio.
+ * - `onStart`: called the moment playback actually begins (used for counters).
+ */
+export default function AudioPlayer({ src, title = 'Song preview', locked = false, onLocked, onStart }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -40,6 +45,10 @@ export default function AudioPlayer({ src, title = 'Song preview' }) {
   }, []);
 
   const toggle = () => {
+    if (locked) {
+      onLocked?.();
+      return;
+    }
     const el = audioRef.current;
     if (!el) return;
     if (playing) {
@@ -48,6 +57,7 @@ export default function AudioPlayer({ src, title = 'Song preview' }) {
     } else {
       el.play();
       setPlaying(true);
+      onStart?.();
     }
   };
 
@@ -65,10 +75,11 @@ export default function AudioPlayer({ src, title = 'Song preview' }) {
       <button
         type="button"
         onClick={toggle}
-        aria-label={playing ? 'Pause' : 'Play'}
+        aria-label={locked ? `Unlock ${title}` : playing ? 'Pause' : 'Play'}
+        title={locked ? 'Unlock this track' : undefined}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-night transition hover:brightness-110"
       >
-        {playing ? <FiPause className="h-4 w-4" /> : <FiPlay className="ml-0.5 h-4 w-4" />}
+        {locked ? <FiLock className="h-4 w-4" /> : playing ? <FiPause className="h-4 w-4" /> : <FiPlay className="ml-0.5 h-4 w-4" />}
       </button>
       <div className="min-w-0 flex-1">
         <div

@@ -43,8 +43,7 @@ export default function Home() {
   const [contentError, setContentError] = useState(false);
 
   useEffect(() => {
-    const loadHomeContent = async () => {
-      setContentError(false);
+    const loadHomeContent = async () => {      setContentError(false);
       try {
         const [songRes, videoRes, eventRes, galleryRes] = await Promise.all([
           api.get('/songs', { params: { featured: 'true', limit: 4 } }),
@@ -71,6 +70,13 @@ export default function Home() {
 
     loadHomeContent();
   }, []);
+
+  // Playback starts when the video opens: record the view and bump the counter.
+  const openVideo = (video) => {
+    setPlayingVideo(video);
+    api.post(`/videos/${video.id}/view`).catch(() => {});
+    setVideo((cur) => (cur?.id === video.id ? { ...cur, view_count: (cur.view_count || 0) + 1 } : cur));
+  };
 
   const heroTitle = settings?.hero_title || 'Denis Ndayishimiye';
   const heroSubtitle = settings?.hero_subtitle || 'Gospel Artist • Guitarist • Singer-Songwriter • Worship Leader';
@@ -268,7 +274,7 @@ export default function Home() {
           <SectionHeading eyebrow="Watch" title="Latest Video" subtitle="Worship sessions, live performances and ministry moments." />
           {video ? (
             <div className="mx-auto max-w-3xl">
-              <VideoCard video={video} index={0} onPlay={setPlayingVideo} />
+              <VideoCard video={video} index={0} onPlay={openVideo} />
               <div className="mt-8 text-center">
                 <Link to="/videos" className="btn-primary">
                   All Videos <FaArrowRight className="h-4 w-4" />

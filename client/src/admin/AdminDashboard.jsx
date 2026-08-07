@@ -8,11 +8,14 @@ import {
   FaEnvelopeOpenText,
   FaPlus,
   FaNewspaper,
+  FaSackDollar,
+  FaHeadphones,
 } from 'react-icons/fa6';
 import api from '../api/client.js';
 import StatCard from './components/StatCard.jsx';
 import Loader from '../components/Loader.jsx';
 import { useToast } from './components/Toast.jsx';
+import { formatMoney, formatNumber } from '../lib/format.js';
 
 function timeAgo(date) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -22,15 +25,28 @@ function timeAgo(date) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
+const METHOD_LABEL = {
+  mobile_money: 'Mobile Money',
+  card: 'Card',
+};
+
 export default function AdminDashboard() {
   const { show } = useToast();
   const [stats, setStats] = useState(null);
+  const [metrics, setMetrics] = useState(null);
 
   useEffect(() => {
     api
       .get('/dashboard/stats')
       .then((res) => setStats(res.data.data))
       .catch(() => show('Could not load dashboard statistics.', 'error'));
+  }, [show]);
+
+  useEffect(() => {
+    api
+      .get('/admin/metrics')
+      .then((res) => setMetrics(res.data.data))
+      .catch(() => show('Could not load payment metrics.', 'error'));
   }, [show]);
 
   if (!stats) return <Loader />;
@@ -43,6 +59,13 @@ export default function AdminDashboard() {
     { icon: FaNewspaper, label: 'News Articles', value: stats.totalNews, to: '/admin/news' },
     { icon: FaEnvelopeOpenText, label: 'Unread Messages', value: stats.unreadMessages, to: '/admin/messages' },
   ];
+
+  if (metrics) {
+    cards.push(
+      { icon: FaSackDollar, label: 'Subscription Revenue', value: formatMoney(metrics.subscriptionRevenue), to: '/admin/settings' },
+      { icon: FaHeadphones, label: 'Total Plays & Views', value: formatNumber(metrics.totalPlaysViews), to: '/admin' }
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -98,6 +121,67 @@ export default function AdminDashboard() {
           </ul>
         )}
       </div>
+
+      {/* Subscribers */}
+      {metrics && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-white/10">
+            <div>
+              <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white">Subscribers</h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                {metrics.subscribers.length} subscription purchase{metrics.subscribers.length !== 1 ? 's' : ''} •{' '}
+                {formatMoney(metrics.subscriptionRevenue)} total from subscriptions
+              </p>
+            </div>
+            <Link to="/admin/settings" className="text-sm font-semibold text-gold transition hover:underline">
+              Payment settings
+            </Link>
+          </div>
+
+          {metrics.subscribers.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-slate-500">No subscriptions yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400 dark:border-white/10">
+                    <th className="px-6 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">Phone</th>
+                    <th className="px-4 py-3 font-semibold">Method</th>
+                    <th className="px-4 py-3 font-semibold">Amount</th>
+                    <th className="px-4 py-3 font-semibold">Date</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                  {metrics.subscribers.map((s) => (
+                    <tr key={s.id}>
+                      <td className="max-w-[220px] truncate px-6 py-3 font-medium text-slate-800 dark:text-slate-200">
+                        {s.payer_email}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{s.payer_phone || '—'}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                        {METHOD_LABEL[s.payment_method] || s.payment_method}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">{formatMoney(s.amount)}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{timeAgo(s.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${
+                            s.status === 'active' ? 'bg-green-500/15 text-green-500' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400'
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

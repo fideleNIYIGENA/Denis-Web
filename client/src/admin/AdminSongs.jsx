@@ -15,6 +15,8 @@ const EMPTY = {
   description: '',
   release_date: '',
   featured: false,
+  price: '',
+  is_free: true,
   spotify_url: '',
   apple_music_url: '',
   boomplay_url: '',
@@ -84,6 +86,8 @@ export default function AdminSongs() {
       description: song.description || '',
       release_date: song.release_date?.slice(0, 10) || '',
       featured: !!song.featured,
+      price: song.price ?? '',
+      is_free: song.is_free !== false,
       spotify_url: song.spotify_url || '',
       apple_music_url: song.apple_music_url || '',
       boomplay_url: song.boomplay_url || '',
@@ -106,17 +110,28 @@ export default function AdminSongs() {
     setSaving(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v === true ? 'true' : v === false ? 'false' : String(v ?? '')));
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === 'price' || k === 'is_free') return; // saved via the pricing endpoint
+        fd.append(k, v === true ? 'true' : v === false ? 'false' : String(v ?? ''));
+      });
       if (coverFile) fd.append('cover', coverFile);
       if (audioFile) fd.append('audio', audioFile);
 
+      let songId = editing?.id;
       if (editing) {
         await api.put(`/songs/${editing.id}`, fd);
         show('Song updated successfully.');
       } else {
-        await api.post('/songs', fd);
+        const res = await api.post('/songs', fd);
+        songId = res.data.data.id;
         show('Song created successfully.');
       }
+
+      await api.put(`/admin/songs/${songId}/pricing`, {
+        price: Number(form.price) || 0,
+        is_free: form.is_free,
+      });
+
       setModalOpen(false);
       fetchSongs();
     } catch (err) {
@@ -200,7 +215,8 @@ export default function AdminSongs() {
                     )}
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {song.genre} • {song.release_date || 'No release date'}
+                    {song.genre} • {song.release_date || 'No release date'} •{' '}
+                    {song.is_free ? 'Free' : `RWF ${Number(song.price || 0).toLocaleString()}`} • {song.play_count || 0} plays
                   </p>
                 </div>
               </div>
@@ -236,6 +252,15 @@ export default function AdminSongs() {
               <input name="featured" type="checkbox" checked={form.featured} onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))} className="h-4 w-4 accent-gold" />
               <span className="text-sm text-slate-600 dark:text-slate-300">Show as featured on the home page</span>
             </label>
+          </FormField>
+          <FormField label="Free to Listen">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-300 px-4 dark:border-white/10">
+              <input name="is_free" type="checkbox" checked={form.is_free} onChange={(e) => setForm((f) => ({ ...f, is_free: e.target.checked }))} className="h-4 w-4 accent-gold" />
+              <span className="text-sm text-slate-600 dark:text-slate-300">Everyone can play this track for free</span>
+            </label>
+          </FormField>
+          <FormField label="Track Price (RWF)" hint={form.is_free ? 'Free tracks are always playable — no price is charged.' : 'Set 0 to make the track free.'}>
+            <input name="price" type="number" min="0" step="100" value={form.price} disabled={form.is_free} onChange={setField} className="input disabled:opacity-50" />
           </FormField>
           <div className="sm:col-span-2">
             <FormField label="Description">

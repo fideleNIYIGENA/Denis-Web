@@ -1,15 +1,22 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaLocationDot, FaCalendarDays, FaArrowRight } from 'react-icons/fa6';
+import { FaLocationDot, FaCalendarDays, FaArrowRight, FaTicket } from 'react-icons/fa6';
 import { motion } from 'framer-motion';
 import LazyImage from './LazyImage.jsx';
+import CheckoutModal from './CheckoutModal.jsx';
+import { formatMoney } from '../lib/format.js';
 
 function formatEventDate(date) {
   const d = new Date(date);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** Upcoming event card with poster, date, venue and registration link. */
+/** Upcoming event card with poster, date, venue, ticket price and checkout. */
 export default function EventCard({ event, index = 0 }) {
+  const [buyOpen, setBuyOpen] = useState(false);
+  const ticketPrice = Number(event.ticket_price) || 0;
+  const hasTicket = ticketPrice > 0;
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 24 }}
@@ -27,6 +34,11 @@ export default function EventCard({ event, index = 0 }) {
         >
           {event.status === 'upcoming' ? 'Upcoming' : 'Past'}
         </span>
+        {hasTicket && (
+          <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-night/80 px-3 py-1 text-[11px] font-bold text-gold backdrop-blur">
+            <FaTicket className="h-3 w-3" /> {formatMoney(ticketPrice)}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-5">
@@ -49,8 +61,24 @@ export default function EventCard({ event, index = 0 }) {
           <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{event.description}</p>
         )}
 
-        <div className="mt-auto pt-2">
-          {event.registration_link ? (
+        <div className="mt-auto flex flex-col gap-2 pt-2">
+          {hasTicket ? (
+            <>
+              <button type="button" onClick={() => setBuyOpen(true)} className="btn-primary w-full text-center">
+                <FaTicket className="h-3.5 w-3.5" /> Buy Ticket — {formatMoney(ticketPrice)}
+              </button>
+              {event.registration_link && (
+                <a
+                  href={event.registration_link}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="btn-outline w-full border-gold/40 text-center text-gold"
+                >
+                  Register Now <FaArrowRight className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </>
+          ) : event.registration_link ? (
             <a
               href={event.registration_link}
               target="_blank"
@@ -66,6 +94,8 @@ export default function EventCard({ event, index = 0 }) {
           )}
         </div>
       </div>
+
+      <CheckoutModal open={buyOpen} onClose={() => setBuyOpen(false)} type="event_ticket" item={event} />
     </motion.article>
   );
 }
