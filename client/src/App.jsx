@@ -27,6 +27,7 @@ const AdminGallery = lazy(() => import('./admin/AdminGallery.jsx'));
 const AdminEvents = lazy(() => import('./admin/AdminEvents.jsx'));
 const AdminNews = lazy(() => import('./admin/AdminNews.jsx'));
 const AdminMessages = lazy(() => import('./admin/AdminMessages.jsx'));
+const AdminSubscribers = lazy(() => import('./admin/AdminSubscribers.jsx'));
 const AdminSocial = lazy(() => import('./admin/AdminSocial.jsx'));
 const AdminSettings = lazy(() => import('./admin/AdminSettings.jsx'));
 const AdminProfile = lazy(() => import('./admin/AdminProfile.jsx'));
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="events" element={<AdminEvents />} />
           <Route path="news" element={<AdminNews />} />
           <Route path="messages" element={<AdminMessages />} />
+          <Route path="subscribers" element={<AdminSubscribers />} />
           <Route path="social" element={<AdminSocial />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="profile" element={<AdminProfile />} />

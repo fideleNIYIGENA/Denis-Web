@@ -54,7 +54,8 @@ function PaymentSettingsSection({ show }) {
         payment_methods: form.payment_methods,
         momo_number: form.momo_number,
         momo_merchant_code: form.momo_merchant_code,
-        subscription_price: Number(form.subscription_price) || 0,
+        subscription_price_rwf: Number(form.subscription_price_rwf) || 0,
+        subscription_price_usd: Number(form.subscription_price_usd) || 0,
       });
       show('Payment settings updated successfully.');
     } catch (err) {
@@ -120,14 +121,24 @@ function PaymentSettingsSection({ show }) {
         </div>
       )}
 
-      <div className="mt-6 max-w-sm">
-        <FormField label="Subscription Price (RWF)" hint="Price for 30 days of full-access listening.">
+      <div className="mt-6 grid max-w-2xl gap-5 sm:grid-cols-2">
+        <FormField label="Subscription Price (RWF)" hint="RWF price for 30 days of full-access listening.">
           <input
             type="number"
             min="0"
             step="100"
-            value={form.subscription_price ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, subscription_price: e.target.value }))}
+            value={form.subscription_price_rwf ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, subscription_price_rwf: e.target.value }))}
+            className="input"
+          />
+        </FormField>
+        <FormField label="Subscription Price (USD)" hint="USD price for 30 days of full-access listening.">
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={form.subscription_price_usd ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, subscription_price_usd: e.target.value }))}
             className="input"
           />
         </FormField>

@@ -4,18 +4,20 @@ import { FaLocationDot, FaCalendarDays, FaArrowRight, FaTicket } from 'react-ico
 import { motion } from 'framer-motion';
 import LazyImage from './LazyImage.jsx';
 import CheckoutModal from './CheckoutModal.jsx';
-import { formatMoney } from '../lib/format.js';
+import { formatPrice, pickPrice } from '../lib/format.js';
+import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 function formatEventDate(date) {
   const d = new Date(date);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** Upcoming event card with poster, date, venue, ticket price and checkout. */
+/** Upcoming event card with poster, date, venue, dual-currency ticket price and checkout. */
 export default function EventCard({ event, index = 0 }) {
   const [buyOpen, setBuyOpen] = useState(false);
-  const ticketPrice = Number(event.ticket_price) || 0;
-  const hasTicket = ticketPrice > 0;
+  const { currency } = useCurrency();
+  const price = pickPrice(event.ticket_price_rwf, event.ticket_price_usd, currency);
+  const hasTicket = price.amount > 0;
 
   return (
     <motion.article
@@ -36,7 +38,7 @@ export default function EventCard({ event, index = 0 }) {
         </span>
         {hasTicket && (
           <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-night/80 px-3 py-1 text-[11px] font-bold text-gold backdrop-blur">
-            <FaTicket className="h-3 w-3" /> {formatMoney(ticketPrice)}
+            <FaTicket className="h-3 w-3" /> {formatPrice(price.amount, price.currency)}
           </span>
         )}
       </div>
@@ -65,7 +67,7 @@ export default function EventCard({ event, index = 0 }) {
           {hasTicket ? (
             <>
               <button type="button" onClick={() => setBuyOpen(true)} className="btn-primary w-full text-center">
-                <FaTicket className="h-3.5 w-3.5" /> Buy Ticket — {formatMoney(ticketPrice)}
+                <FaTicket className="h-3.5 w-3.5" /> Buy Ticket — {formatPrice(price.amount, price.currency)}
               </button>
               {event.registration_link && (
                 <a

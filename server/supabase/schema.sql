@@ -5,6 +5,7 @@
 --  Order matters: tables first, then functions, triggers & indexes.
 --  The app uses the Service Role Key, so RLS is disabled defensively
 --  on every table (service role bypasses RLS anyway).
+--  Every statement is idempotent and safe to re-run.
 -- ============================================================
 
 -- ---------------------------------------------------------------------------
@@ -21,7 +22,7 @@ create table if not exists public.admin (
 );
 
 -- ---------------------------------------------------------------------------
--- 2. SONGS
+-- 2. SONGS  (music/tracks table)
 -- ---------------------------------------------------------------------------
 create table if not exists public.songs (
   id               uuid primary key default gen_random_uuid(),
@@ -39,8 +40,9 @@ create table if not exists public.songs (
   audiomack_url    text,
   youtube_url      text,
   download_url     text,
-  price            numeric(12,2) not null default 0,   -- 0 = free listening
-  is_free          boolean not null default true,
+  price_rwf        numeric(12,2) not null default 0,   -- RWF price (0 = no RWF price)
+  price_usd        numeric(12,2) not null default 0,   -- USD price (0 = no USD price)
+  is_free          boolean not null default true,      -- true = free listening
   play_count       integer not null default 0,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -89,7 +91,8 @@ create table if not exists public.events (
   description        text,
   poster_url         text,
   registration_link  text,
-  ticket_price       numeric(12,2) not null default 0,
+  ticket_price_rwf   numeric(12,2) not null default 0,
+  ticket_price_usd   numeric(12,2) not null default 0,
   status             text not null default 'upcoming'
                      constraint events_status_check check (status in ('upcoming', 'past')),
   created_at         timestamptz not null default now(),
@@ -163,22 +166,23 @@ create table if not exists public.subscribers (
 -- 10. SETTINGS  (single row, id = 1)
 -- ---------------------------------------------------------------------------
 create table if not exists public.settings (
-  id              integer primary key default 1 check (id = 1),
-  site_name       text not null default 'Denis Ndayishimiye',
-  site_tagline    text default '',
-  site_description text default '',
-  hero_title      text default 'Denis Ndayishimiye',
-  hero_subtitle   text default 'Gospel Artist • Guitarist • Worship Leader',
-  hero_image_url  text default '',
-  hero_video_url  text default '',
-  about_summary   text default '',
-  contact_address text default '',
-  payment_methods    jsonb not null default '["mobile_money","card"]',
-  momo_number        text,
-  momo_merchant_code text,
-  subscription_price numeric(12,2) not null default 5000,
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
+  id                     integer primary key default 1 check (id = 1),
+  site_name              text not null default 'Denis Ndayishimiye',
+  site_tagline           text default '',
+  site_description       text default '',
+  hero_title             text default 'Denis Ndayishimiye',
+  hero_subtitle          text default 'Gospel Artist • Guitarist • Worship Leader',
+  hero_image_url         text default '',
+  hero_video_url         text default '',
+  about_summary          text default '',
+  contact_address        text default '',
+  payment_methods        jsonb not null default '["mobile_money","card"]',
+  momo_number            text,
+  momo_merchant_code     text,
+  subscription_price_rwf numeric(12,2) not null default 5000,
+  subscription_price_usd numeric(12,2) not null default 5,
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------------------
@@ -240,40 +244,75 @@ create table if not exists public.payments (
   payment_method text not null
                  constraint payments_method_check check (payment_method in ('mobile_money', 'card')),
   amount         numeric(12,2) not null default 0,
+  currency       text not null default 'RWF'
+                 constraint payments_currency_check check (currency in ('RWF', 'USD')),
   type           text not null
                  constraint payments_type_check check (type in ('subscription', 'track_buy', 'event_ticket')),
   item_id        uuid,                                  -- track or event purchased
-  access_token   text not null unique,                  -- unlocks content on the buyer's device
-  expires_at     timestamptz,                           -- set for subscriptions
-  status         text not null default 'completed'
-                 constraint payments_status_check check (status in ('completed', 'pending', 'failed')),
+  access_token   text unique,                           -- generated on admin approval
+  expires_at     timestamptz,                           -- set on approval for subscriptions
+  status         text not null default 'pending'
+                 constraint payments_status_check check (status in ('pending', 'completed', 'rejected')),
   created_at     timestamptz not null default now()
 );
 
-create index if not exists idx_payments_email   on public.payments (payer_email);
-create index if not exists idx_payments_type    on public.payments (type);
-create index if not exists idx_payments_status  on public.payments (status);
-create index if not exists idx_payments_item    on public.payments (item_id);
-create index if not exists idx_payments_created on public.payments (created_at desc);
+create index if not exists idx_payments_email    on public.payments (payer_email);
+create index if not exists idx_payments_type     on public.payments (type);
+create index if not exists idx_payments_status   on public.payments (status);
+create index if not exists idx_payments_currency on public.payments (currency);
+create index if not exists idx_payments_item     on public.payments (item_id);
+create index if not exists idx_payments_created  on public.payments (created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- 12. IDEMPOTENT MIGRATIONS — safe to re-run on existing deployments.
+--     Handles the pre-payments schema (single-currency `price` columns).
 -- ---------------------------------------------------------------------------
-alter table public.settings add column if not exists payment_methods    jsonb not null default '["mobile_money","card"]';
-alter table public.settings add column if not exists momo_number        text;
-alter table public.settings add column if not exists momo_merchant_code text;
-alter table public.settings add column if not exists subscription_price numeric(12,2) not null default 5000;
+alter table public.settings add column if not exists payment_methods        jsonb not null default '["mobile_money","card"]';
+alter table public.settings add column if not exists momo_number            text;
+alter table public.settings add column if not exists momo_merchant_code     text;
+alter table public.settings add column if not exists subscription_price_rwf numeric(12,2) not null default 5000;
+alter table public.settings add column if not exists subscription_price_usd numeric(12,2) not null default 5;
 
-alter table public.songs add column if not exists price      numeric(12,2) not null default 0;
+alter table public.songs add column if not exists price_rwf  numeric(12,2) not null default 0;
+alter table public.songs add column if not exists price_usd  numeric(12,2) not null default 0;
 alter table public.songs add column if not exists is_free    boolean not null default true;
 alter table public.songs add column if not exists play_count integer not null default 0;
 
 alter table public.videos add column if not exists view_count integer not null default 0;
 
-alter table public.events add column if not exists ticket_price numeric(12,2) not null default 0;
+alter table public.events add column if not exists ticket_price_rwf numeric(12,2) not null default 0;
+alter table public.events add column if not exists ticket_price_usd numeric(12,2) not null default 0;
+
+alter table public.payments add column if not exists currency text not null default 'RWF';
+
+-- Replace the payments status constraint with the approval workflow states.
+alter table public.payments drop constraint if exists payments_status_check;
+alter table public.payments add constraint payments_status_check check (status in ('pending', 'completed', 'rejected'));
 
 -- ---------------------------------------------------------------------------
--- 13. ATOMIC COUNTERS — safe single-statement increments for play/view stats.
+-- 13. LEGACY DATA COPY — move any existing single-currency price values into
+--     the new RWF columns so previously-set prices survive the upgrade.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'subscription_price')
+     and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'subscription_price_rwf') then
+    update public.settings set subscription_price_rwf = subscription_price where subscription_price_rwf = 0 and subscription_price > 0;
+  end if;
+
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'songs' and column_name = 'price')
+     and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'songs' and column_name = 'price_rwf') then
+    update public.songs set price_rwf = price where price_rwf = 0 and price > 0;
+  end if;
+
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'events' and column_name = 'ticket_price')
+     and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'events' and column_name = 'ticket_price_rwf') then
+    update public.events set ticket_price_rwf = ticket_price where ticket_price_rwf = 0 and ticket_price > 0;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 14. ATOMIC COUNTERS — safe single-statement increments for play/view stats.
 -- ---------------------------------------------------------------------------
 create or replace function public.increment_song_play(song_id uuid)
 returns integer language sql security definer as $$
@@ -284,6 +323,33 @@ create or replace function public.increment_video_view(video_id uuid)
 returns integer language sql security definer as $$
   update public.videos set view_count = coalesce(view_count, 0) + 1 where id = video_id returning view_count;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 15. SUBSCRIPTION DEDUPLICATION — one active subscription per email.
+-- ---------------------------------------------------------------------------
+
+-- a) Hard constraint: never allow more than one PENDING subscription per email.
+--    Prevents double submissions from creating duplicate rows even when two
+--    checkout requests race each other.
+create unique index if not exists idx_payments_one_pending_subscription
+  on public.payments (payer_email)
+  where type = 'subscription' and status = 'pending';
+
+-- b) Clean-up routine: remove duplicate subscription records sharing the same
+--    email, keeping only the most recent / active record per email.
+--    For each email we keep exactly one subscription row — preferring an
+--    active (pending/completed) row over a rejected one, newest first — and
+--    delete every other subscription row. Idempotent and safe to re-run.
+delete from public.payments p
+where p.type = 'subscription'
+  and p.id not in (
+    select distinct on (payer_email) id
+    from public.payments
+    where type = 'subscription'
+    order by payer_email,
+             (case when status in ('pending', 'completed') then 1 else 0 end) desc,
+             created_at desc
+  );
 
 -- ---------------------------------------------------------------------------
 -- RLS — service role bypasses RLS, but we disable it explicitly so the

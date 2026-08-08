@@ -1,63 +1,86 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import api from '../api/client.js';
-import { getCredentials, subscribeCredentials } from '../lib/purchases.js';
+import { getPayerEmail, setPayerEmail } from '../lib/purchases.js';
+
+const isPaid = (song) =>
+  !!song && song.is_free !== true && (Number(song.price_rwf || 0) > 0 || Number(song.price_usd || 0) > 0);
 
 /**
- * Determines whether the current visitor may play a track.
+ * Email-based access gate for paid tracks.
  *
- * A track is playable when it is free, OR the visitor has a valid
- * subscription, OR they purchased this exact track (both are verified
- * server-side via /songs/:id/verify-access using the stored credentials).
+ * - `requestPlay()`: free tracks play immediately; paid tracks run the email
+ *   verification flow (prompt for email → POST /payments/verify-email →
+ *   completed / pending / unpaid).
+ * - After a successful verification the track is unlocked on this device and
+ *   playback is triggered automatically via the returned `playSignal`.
+ * - `verifyOpen` / `checkoutOpen` drive the VerifyModal / CheckoutModal that
+ *   the calling card renders.
  */
 export default function useTrackAccess(song) {
   const id = song?.id;
-  const isFree = !song || song.is_free === true || Number(song.price || 0) <= 0;
+  const paid = isPaid(song);
 
-  const [allowed, setAllowed] = useState(isFree);
-  const [checking, setChecking] = useState(false);
-  const [checked, setChecked] = useState(isFree);
-  const [version, setVersion] = useState(0);
+  const [allowed, setAllowed] = useState(!paid);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState('');
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [playSignal, setPlaySignal] = useState(0);
 
-  useEffect(() => {
-    if (!id || isFree) {
-      setAllowed(true);
-      setChecking(false);
-      setChecked(true);
-      return undefined;
+  const openVerify = useCallback((message = '') => {
+    setPendingMessage(message);
+    setVerifyOpen(true);
+  }, []);
+
+  const unlockAndPlay = useCallback(() => {
+    setAllowed(true);
+    setPlaySignal((n) => n + 1);
+  }, []);
+
+  const verify = useCallback(
+    async (email) => {
+      const { data } = await api.post('/payments/verify-email', { email, track_id: id });
+      return data;
+    },
+    [id]
+  );
+
+  const requestPlay = useCallback(async () => {
+    if (!paid) {
+      unlockAndPlay();
+      return;
     }
-
-    let active = true;
-    const creds = getCredentials();
-    if (!creds.token || !creds.email) {
-      setAllowed(false);
-      setChecking(false);
-      setChecked(true);
-      return undefined;
+    const email = getPayerEmail();
+    if (!email) {
+      openVerify();
+      return;
     }
+    try {
+      const data = await verify(email);
+      if (data.valid) {
+        setPayerEmail(email);
+        unlockAndPlay();
+      } else if (data.status === 'pending') {
+        openVerify(data.message || 'Your payment is awaiting admin approval.');
+      } else {
+        setCheckoutOpen(true);
+      }
+    } catch {
+      openVerify();
+    }
+  }, [paid, verify, openVerify, unlockAndPlay]);
 
-    setChecking(true);
-    api
-      .post(`/songs/${id}/verify-access`, { email: creds.email, access_token: creds.token })
-      .then((res) => {
-        if (active) setAllowed(!!res.data.allowed);
-      })
-      .catch(() => {
-        if (active) setAllowed(false);
-      })
-      .finally(() => {
-        if (active) {
-          setChecking(false);
-          setChecked(true);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [id, isFree, version]);
-
-  // Re-verify whenever the stored credentials change (e.g. after a checkout).
-  useEffect(() => subscribeCredentials(() => setVersion((v) => v + 1)), []);
-
-  return { isFree, allowed, checking, checked };
+  return {
+    paid,
+    allowed,
+    locked: paid && !allowed,
+    verifyOpen,
+    pendingMessage,
+    checkoutOpen,
+    playSignal,
+    openVerify,
+    setCheckoutOpen,
+    verify,
+    unlockAndPlay,
+    requestPlay,
+  };
 }

@@ -7,8 +7,10 @@ import LazyImage from './LazyImage.jsx';
 import AudioPlayer from './AudioPlayer.jsx';
 import StreamingLinks from './StreamingLinks.jsx';
 import CheckoutModal from './CheckoutModal.jsx';
+import VerifyModal from './VerifyModal.jsx';
 import useTrackAccess from '../hooks/useTrackAccess.js';
-import { formatMoney, formatNumber } from '../lib/format.js';
+import { formatNumber, formatPrice, pickPrice } from '../lib/format.js';
+import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 export function formatDate(date) {
   if (!date) return '';
@@ -35,14 +37,16 @@ async function shareSong(song) {
 /** Beautiful song card with cover, meta, player, play count and streaming links. */
 export default function MusicCard({ song, index = 0 }) {
   const [plays, setPlays] = useState(Number(song.play_count) || 0);
-  const [buyOpen, setBuyOpen] = useState(false);
-  const { isFree, allowed } = useTrackAccess(song);
-  const locked = !isFree && !allowed;
+  const { currency } = useCurrency();
+  const { locked, verifyOpen, pendingMessage, checkoutOpen, playSignal, setCheckoutOpen, unlockAndPlay, requestPlay } =
+    useTrackAccess(song);
 
   const handleStart = () => {
     setPlays((p) => p + 1);
     api.post(`/songs/${song.id}/play`).catch(() => {});
   };
+
+  const price = pickPrice(song.price_rwf, song.price_usd, currency);
 
   return (
     <motion.article
@@ -94,7 +98,7 @@ export default function MusicCard({ song, index = 0 }) {
           </div>
           {locked && (
             <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold text-gold">
-              {formatMoney(song.price)}
+              {formatPrice(price.amount, price.currency)}
             </span>
           )}
         </div>
@@ -106,20 +110,31 @@ export default function MusicCard({ song, index = 0 }) {
         <AudioPlayer
           src={song.audio_url}
           title={song.title}
+          trackId={song.id}
           locked={locked}
-          onLocked={() => setBuyOpen(true)}
+          onLocked={requestPlay}
+          playSignal={playSignal}
           onStart={handleStart}
         />
 
         <StreamingLinks song={song} compact />
       </div>
 
-      <CheckoutModal
-        open={buyOpen}
-        onClose={() => setBuyOpen(false)}
-        type="track_buy"
-        item={song}
+      <VerifyModal
+        open={verifyOpen}
+        onClose={() => setVerifyOpen(false)}
+        trackId={song.id}
+        initialMessage={pendingMessage}
+        onVerified={() => {
+          setVerifyOpen(false);
+          unlockAndPlay();
+        }}
+        onUnpaid={() => {
+          setVerifyOpen(false);
+          setCheckoutOpen(true);
+        }}
       />
+      <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} type="track_buy" item={song} />
     </motion.article>
   );
 }

@@ -7,6 +7,7 @@ import ConfirmModal from './components/ConfirmModal.jsx';
 import FormField from './components/FormField.jsx';
 import Loader from '../components/Loader.jsx';
 import Pagination from '../components/Pagination.jsx';
+import { formatPrice } from '../lib/format.js';
 
 const EMPTY = {
   title: '',
@@ -15,7 +16,8 @@ const EMPTY = {
   description: '',
   registration_link: '',
   status: 'upcoming',
-  ticket_price: '',
+  ticket_price_rwf: '',
+  ticket_price_usd: '',
 };
 
 export default function AdminEvents() {
@@ -69,7 +71,8 @@ export default function AdminEvents() {
       description: ev.description || '',
       registration_link: ev.registration_link || '',
       status: ev.status || 'upcoming',
-      ticket_price: ev.ticket_price ?? '',
+      ticket_price_rwf: ev.ticket_price_rwf ?? '',
+      ticket_price_usd: ev.ticket_price_usd ?? '',
     });
     setPosterFile(null);
     setModalOpen(true);
@@ -86,7 +89,7 @@ export default function AdminEvents() {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
-        if (k === 'ticket_price') return; // saved via the pricing endpoint
+        if (k === 'ticket_price_rwf' || k === 'ticket_price_usd') return; // saved via the pricing endpoint
         fd.append(k, String(v ?? ''));
       });
       if (posterFile) fd.append('poster', posterFile);
@@ -102,7 +105,8 @@ export default function AdminEvents() {
       }
 
       await api.put(`/admin/events/${eventId}/pricing`, {
-        ticket_price: Number(form.ticket_price) || 0,
+        ticket_price_rwf: Number(form.ticket_price_rwf) || 0,
+        ticket_price_usd: Number(form.ticket_price_usd) || 0,
       });
 
       setModalOpen(false);
@@ -174,7 +178,9 @@ export default function AdminEvents() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {ev.event_date || 'No date'} {ev.venue ? `• ${ev.venue}` : ''}{' '}
-                    {Number(ev.ticket_price) > 0 ? `• RWF ${Number(ev.ticket_price).toLocaleString()} ticket` : ''}
+                    {Number(ev.ticket_price_rwf) > 0 || Number(ev.ticket_price_usd) > 0
+                      ? `• ${formatPrice(ev.ticket_price_rwf, 'RWF')} / ${formatPrice(ev.ticket_price_usd, 'USD')} ticket`
+                      : ''}
                   </p>
                 </div>
               </div>
@@ -212,7 +218,10 @@ export default function AdminEvents() {
             </FormField>
           </div>
           <FormField label="Ticket Price (RWF)" hint="Set 0 for free entry.">
-            <input name="ticket_price" type="number" min="0" step="500" value={form.ticket_price} onChange={setField} className="input" />
+            <input name="ticket_price_rwf" type="number" min="0" step="500" value={form.ticket_price_rwf} onChange={setField} className="input" />
+          </FormField>
+          <FormField label="Ticket Price (USD)" hint="Set 0 for free entry.">
+            <input name="ticket_price_usd" type="number" min="0" step="0.5" value={form.ticket_price_usd} onChange={setField} className="input" />
           </FormField>
           <FormField label="Status">
             <select name="status" value={form.status} onChange={setField} className="input">

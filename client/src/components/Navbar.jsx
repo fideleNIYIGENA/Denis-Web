@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { FiMenu, FiX, FiMoon, FiSun, FiMusic } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa6';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import { useCurrency } from '../contexts/CurrencyContext.jsx';
 import CheckoutModal from './CheckoutModal.jsx';
 
 const LINKS = [
@@ -20,6 +21,7 @@ const LINKS = [
 
 export default function Navbar() {
   const { dark, toggle } = useTheme();
+  const { currency, setCurrency } = useCurrency();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
@@ -86,6 +88,31 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2">
+          {/* Currency toggle (RWF / USD) */}
+          <div
+            className={`flex items-center rounded-full p-0.5 transition ${
+              transparent ? 'bg-white/10' : 'bg-slate-100 dark:bg-white/10'
+            }`}
+          >
+            {['RWF', 'USD'].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
+                aria-pressed={currency === c}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  currency === c
+                    ? 'bg-gold-gradient text-night shadow'
+                    : transparent
+                      ? 'text-white/70 hover:text-gold'
+                      : 'text-slate-500 hover:text-gold dark:text-slate-400'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
           {/* Subscribe (guest checkout, no account needed) */}
           <button
             type="button"
@@ -138,6 +165,22 @@ export default function Navbar() {
             className="overflow-hidden border-b border-white/10 bg-white/95 backdrop-blur-xl dark:bg-night/95 xl:hidden"
           >
             <ul className="container-x flex flex-col gap-1 py-4">
+              <li className="mb-1 flex items-center gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/10">
+                <span className="pl-3 text-xs font-bold uppercase tracking-wide text-slate-400">Currency</span>
+                {['RWF', 'USD'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCurrency(c)}
+                    aria-pressed={currency === c}
+                    className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${
+                      currency === c ? 'bg-gold-gradient text-night' : 'text-slate-500 hover:text-gold dark:text-slate-400'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </li>
               <li>
                 <button
                   type="button"

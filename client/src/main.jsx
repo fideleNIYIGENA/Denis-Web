@@ -6,6 +6,8 @@ import './index.css';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import { DataProvider } from './contexts/DataContext.jsx';
+import { CurrencyProvider } from './contexts/CurrencyContext.jsx';
+import { AudioProvider } from './contexts/AudioContext.jsx';
 import { ToastProvider } from './admin/components/Toast.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,7 +17,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <ThemeProvider>
           <AuthProvider>
             <DataProvider>
-              <App />
+              <CurrencyProvider>
+                <AudioProvider>
+                  <App />
+                </AudioProvider>
+              </CurrencyProvider>
             </DataProvider>
           </AuthProvider>
         </ThemeProvider>

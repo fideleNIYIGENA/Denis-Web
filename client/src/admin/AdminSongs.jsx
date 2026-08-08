@@ -8,6 +8,7 @@ import ConfirmModal from './components/ConfirmModal.jsx';
 import FormField from './components/FormField.jsx';
 import Loader from '../components/Loader.jsx';
 import Pagination from '../components/Pagination.jsx';
+import { formatPrice } from '../lib/format.js';
 
 const EMPTY = {
   title: '',
@@ -15,7 +16,8 @@ const EMPTY = {
   description: '',
   release_date: '',
   featured: false,
-  price: '',
+  price_rwf: '',
+  price_usd: '',
   is_free: true,
   spotify_url: '',
   apple_music_url: '',
@@ -86,7 +88,8 @@ export default function AdminSongs() {
       description: song.description || '',
       release_date: song.release_date?.slice(0, 10) || '',
       featured: !!song.featured,
-      price: song.price ?? '',
+      price_rwf: song.price_rwf ?? '',
+      price_usd: song.price_usd ?? '',
       is_free: song.is_free !== false,
       spotify_url: song.spotify_url || '',
       apple_music_url: song.apple_music_url || '',
@@ -111,7 +114,7 @@ export default function AdminSongs() {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
-        if (k === 'price' || k === 'is_free') return; // saved via the pricing endpoint
+        if (k === 'price_rwf' || k === 'price_usd' || k === 'is_free') return; // saved via the pricing endpoint
         fd.append(k, v === true ? 'true' : v === false ? 'false' : String(v ?? ''));
       });
       if (coverFile) fd.append('cover', coverFile);
@@ -128,7 +131,8 @@ export default function AdminSongs() {
       }
 
       await api.put(`/admin/songs/${songId}/pricing`, {
-        price: Number(form.price) || 0,
+        price_rwf: Number(form.price_rwf) || 0,
+        price_usd: Number(form.price_usd) || 0,
         is_free: form.is_free,
       });
 
@@ -216,7 +220,10 @@ export default function AdminSongs() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {song.genre} • {song.release_date || 'No release date'} •{' '}
-                    {song.is_free ? 'Free' : `RWF ${Number(song.price || 0).toLocaleString()}`} • {song.play_count || 0} plays
+                    {song.is_free
+                      ? 'Free'
+                      : `${formatPrice(song.price_rwf, 'RWF')} / ${formatPrice(song.price_usd, 'USD')}`}{' '}
+                    • {song.play_count || 0} plays
                   </p>
                 </div>
               </div>
@@ -260,7 +267,10 @@ export default function AdminSongs() {
             </label>
           </FormField>
           <FormField label="Track Price (RWF)" hint={form.is_free ? 'Free tracks are always playable — no price is charged.' : 'Set 0 to make the track free.'}>
-            <input name="price" type="number" min="0" step="100" value={form.price} disabled={form.is_free} onChange={setField} className="input disabled:opacity-50" />
+            <input name="price_rwf" type="number" min="0" step="100" value={form.price_rwf} disabled={form.is_free} onChange={setField} className="input disabled:opacity-50" />
+          </FormField>
+          <FormField label="Track Price (USD)" hint={form.is_free ? 'Free tracks are always playable — no price is charged.' : 'Set 0 to make the track free.'}>
+            <input name="price_usd" type="number" min="0" step="0.5" value={form.price_usd} disabled={form.is_free} onChange={setField} className="input disabled:opacity-50" />
           </FormField>
           <div className="sm:col-span-2">
             <FormField label="Description">

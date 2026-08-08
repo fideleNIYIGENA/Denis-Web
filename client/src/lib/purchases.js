@@ -1,11 +1,10 @@
 /**
- * Guest access credentials shared across the public site.
+ * Guest payer email shared across the public site.
  *
- * After a successful checkout we store the buyer's email + access token in
- * localStorage so paid content unlocks instantly on this device across
- * browser sessions — no login or account needed.
+ * Access is verified by email against approved payments in the database, so
+ * the only thing we persist on the visitor's device is their email address —
+ * no login or account needed.
  */
-const TOKEN_KEY = 'dn_access_token';
 const EMAIL_KEY = 'dn_payer_email';
 
 const listeners = new Set();
@@ -15,32 +14,39 @@ function emit() {
     try {
       fn();
     } catch {
-      // listener errors must never break credential updates
+      // listener errors must never break email updates
     }
   });
 }
 
-export function getCredentials() {
-  return {
-    token: localStorage.getItem(TOKEN_KEY),
-    email: localStorage.getItem(EMAIL_KEY),
-  };
+export function getPayerEmail() {
+  try {
+    return localStorage.getItem(EMAIL_KEY) || '';
+  } catch {
+    return '';
+  }
 }
 
-export function setCredentials(email, token) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(EMAIL_KEY, email);
+export function setPayerEmail(email) {
+  try {
+    localStorage.setItem(EMAIL_KEY, email);
+  } catch {
+    // storage unavailable — email still applies for the session
+  }
   emit();
 }
 
-export function clearCredentials() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(EMAIL_KEY);
+export function clearPayerEmail() {
+  try {
+    localStorage.removeItem(EMAIL_KEY);
+  } catch {
+    // storage unavailable
+  }
   emit();
 }
 
-/** Subscribe to credential changes. Returns an unsubscribe function. */
-export function subscribeCredentials(fn) {
+/** Subscribe to email changes. Returns an unsubscribe function. */
+export function subscribeEmail(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }

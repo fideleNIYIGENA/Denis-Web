@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FaMobileScreenButton, FaCreditCard, FaXmark, FaCircleCheck } from 'react-icons/fa6';
+import { FaMobileScreenButton, FaCreditCard, FaXmark, FaClockRotateLeft, FaCircleDollarToSlot } from 'react-icons/fa6';
 import { FiLock } from 'react-icons/fi';
 import api from '../api/client.js';
-import { getCredentials, setCredentials } from '../lib/purchases.js';
-import { formatMoney } from '../lib/format.js';
+import { getPayerEmail, setPayerEmail } from '../lib/purchases.js';
+import { formatPrice } from '../lib/format.js';
+import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 const METHODS = [
   { key: 'mobile_money', label: 'Mobile Money', icon: FaMobileScreenButton, hint: 'MTN Mobile Money / Airtel Money' },
-  { key: 'card', label: 'Card', icon: FaCreditCard, hint: 'Debit / credit card' },
+  { key: 'card', label: 'Card', icon: FaCreditCard, hint: 'Debit / credit card (USD)' },
 ];
 
 const TYPE_LABEL = {
@@ -17,22 +18,33 @@ const TYPE_LABEL = {
   event_ticket: 'Event Ticket',
 };
 
-function amountFor(type, item, subscriptionPrice) {
-  if (type === 'subscription') return subscriptionPrice;
-  if (type === 'track_buy') return Number(item?.price || 0);
-  if (type === 'event_ticket') return Number(item?.ticket_price || 0);
-  return 0;
+function amountsFor(type, item, subRwf, subUsd) {
+  if (type === 'subscription') return { rwf: subRwf, usd: subUsd };
+  if (type === 'track_buy') {
+    return { rwf: Number(item?.price_rwf) || 0, usd: Number(item?.price_usd) || 0 };
+  }
+  if (type === 'event_ticket') {
+    return { rwf: Number(item?.ticket_price_rwf) || 0, usd: Number(item?.ticket_price_usd) || 0 };
+  }
+  return { rwf: 0, usd: 0 };
 }
 
 /**
- * Guest checkout modal. Works without an account: the buyer enters an email
- * (and phone for Mobile Money), pays, and receives an access token that is
- * saved to localStorage to unlock content on this device.
+ * Guest checkout modal — no account needed.
+ *
+ * The visitor chooses RWF (local Mobile Money) or USD (card / international
+ * transfer), enters their email + phone, and submits. Every purchase starts as
+ * PENDING and only unlocks once the admin verifies receipt of funds and
+ * approves it in the Admin Dashboard.
  */
 export default function CheckoutModal({ open, onClose, type = 'subscription', item = null, onSuccess }) {
+  const { currency, setCurrency } = useCurrency();
+
   const [methods, setMethods] = useState([]);
   const [momoNumber, setMomoNumber] = useState('');
-  const [subscriptionPrice, setSubscriptionPrice] = useState(0);
+  const [momoMerchantCode, setMomoMerchantCode] = useState('');
+  const [subRwf, setSubRwf] = useState(0);
+  const [subUsd, setSubUsd] = useState(0);
 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -47,7 +59,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
     setError('');
     setResult(null);
     setSubmitting(false);
-    setEmail(getCredentials().email || '');
+    setEmail(getPayerEmail() || '');
     setPhone('');
 
     const onKey = (e) => {
@@ -59,11 +71,18 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
     api
       .get('/payments/settings')
       .then((res) => {
-        const list = res.data.data?.payment_methods || [];
+        const d = res.data.data || {};
+        const list = d.payment_methods || [];
         setMethods(list);
-        setMomoNumber(res.data.data?.momo_number || '');
-        setSubscriptionPrice(res.data.data?.subscription_price || 0);
-        setMethod((prev) => (list.includes(prev) ? prev : list[0] || ''));
+        setMomoNumber(d.momo_number || '');
+        setMomoMerchantCode(d.momo_merchant_code || '');
+        setSubRwf(Number(d.subscription_price_rwf) || 0);
+        setSubUsd(Number(d.subscription_price_usd) || 0);
+        setMethod((prev) => {
+          if (list.includes(prev)) return prev;
+          const preferred = currency === 'USD' ? 'card' : 'mobile_money';
+          return list.includes(preferred) ? preferred : list[0] || '';
+        });
       })
       .catch(() => setError('Could not load payment options. Please try again.'));
 
@@ -73,13 +92,34 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
     };
   }, [open, onClose]);
 
-  const amount = amountFor(type, item, subscriptionPrice);
+  const amounts = amountsFor(type, item, subRwf, subUsd);
+  const amount = currency === 'USD' ? amounts.usd : amounts.rwf;
   const itemTitle = type === 'subscription' ? 'Unlock the full music library' : item?.title || '';
+
+  // RWF → Mobile Money, USD → Card. Keep the pair in sync so the payment
+  // instructions always match the selected currency.
+  const changeCurrency = (c) => {
+    setCurrency(c);
+    const preferred = c === 'RWF' ? 'mobile_money' : 'card';
+    if (methods.includes(preferred)) setMethod(preferred);
+  };
+
+  const changeMethod = (m) => {
+    setMethod(m);
+    setCurrency(m === 'card' ? 'USD' : 'RWF');
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
 
+    if (amount <= 0) {
+      return setError(
+        currency === 'USD'
+          ? 'This item has no USD price yet — please choose RWF.'
+          : 'This item has no RWF price yet — please choose USD.'
+      );
+    }
     if (!method) return setError('Please choose a payment method.');
     if (method === 'mobile_money' && !phone.trim()) {
       return setError('Please enter your Mobile Money phone number.');
@@ -91,16 +131,17 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
         email: email.trim(),
         payment_method: method,
         payment_type: type,
+        currency,
       };
       if (method === 'mobile_money') payload.phone = phone.trim();
       if (item?.id) payload.item_id = item.id;
 
       const res = await api.post('/payments/checkout', payload);
-      setCredentials(email.trim(), res.data.access_token);
+      setPayerEmail(email.trim());
       setResult(res.data);
       onSuccess?.(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Payment could not be completed. Please try again.');
+      setError(err.response?.data?.message || 'Payment could not be submitted. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +158,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
           onClick={onClose}
           role="dialog"
           aria-modal="true"
-          aria-label={result ? 'Payment successful' : 'Checkout'}
+          aria-label={result ? 'Payment submitted' : 'Checkout'}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -129,7 +170,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-white/10">
               <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white">
-                {result ? 'Payment Successful' : TYPE_LABEL[type] || 'Checkout'}
+                {result ? 'Payment Submitted' : TYPE_LABEL[type] || 'Checkout'}
               </h3>
               <button
                 type="button"
@@ -143,29 +184,23 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
 
             {result ? (
               <div className="flex flex-col items-center gap-4 px-6 py-8 text-center">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/15 text-green-500">
-                  <FaCircleCheck className="h-8 w-8" />
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gold/15 text-gold">
+                  <FaClockRotateLeft className="h-8 w-8" />
                 </span>
-                <p className="font-display text-xl font-bold text-slate-900 dark:text-white">
-                  {result.payment?.item_title || 'Access unlocked!'}
-                </p>
+                <p className="font-display text-xl font-bold text-slate-900 dark:text-white">Payment Submitted!</p>
                 <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                  Your purchase is complete. This device can now play all unlocked content — no account needed.
+                  Your access is pending admin verification. Once the admin confirms receipt of your payment, your email
+                  will be unlocked.
                 </p>
                 {result.payment?.amount > 0 && (
                   <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    Amount paid: <span className="text-gold">{formatMoney(result.payment.amount)}</span>
+                    Amount due:{' '}
+                    <span className="text-gold">{formatPrice(result.payment.amount, result.payment.currency)}</span>
                   </p>
                 )}
-                {result.expires_at && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Valid until {new Date(result.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
+                {result.payment?.id && (
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Reference: {result.payment.id.slice(0, 8).toUpperCase()}</p>
                 )}
-                <div className="w-full max-w-xs rounded-xl bg-slate-100 p-3 dark:bg-night-800">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Access Token</p>
-                  <p className="mt-1 break-all font-mono text-xs text-slate-600 dark:text-slate-300">{result.access_token}</p>
-                </div>
                 <button type="button" onClick={onClose} className="btn-primary mt-2">
                   Done
                 </button>
@@ -180,9 +215,42 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                         {type === 'subscription' ? '30 days of full-access listening' : 'One-time payment'}
                       </p>
                     </div>
-                    <p className="shrink-0 font-display text-lg font-bold text-gold">
-                      {amount > 0 ? formatMoney(amount) : 'Free'}
-                    </p>
+                    <p className="shrink-0 font-display text-lg font-bold text-gold">{formatPrice(amount, currency)}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                    ≈ {formatPrice(currency === 'USD' ? amounts.rwf : amounts.usd, currency === 'USD' ? 'RWF' : 'USD')}
+                  </p>
+                </div>
+
+                {/* Currency toggle */}
+                <div>
+                  <span className="label">Pay in</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'RWF', label: 'RWF', hint: 'Mobile Money' },
+                      { key: 'USD', label: 'USD', hint: 'Card / Transfer' },
+                    ].map((c) => {
+                      const active = currency === c.key;
+                      const preferred = c.key === 'RWF' ? 'mobile_money' : 'card';
+                      const disabled = (c.key === 'USD' ? amounts.usd : amounts.rwf) <= 0 || !methods.includes(preferred);
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => changeCurrency(c.key)}
+                          aria-pressed={active}
+                          className={`rounded-xl border px-4 py-3 text-left transition ${
+                            active
+                              ? 'border-gold bg-gold/10'
+                              : 'border-slate-300 hover:border-gold/50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:border-gold/50'
+                          }`}
+                        >
+                          <span className="block text-sm font-bold text-slate-800 dark:text-slate-200">{c.label}</span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">{c.hint}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -201,7 +269,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                     autoComplete="email"
                   />
                   <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                    Used to verify access on this device. No account is created.
+                    Your email is used to verify access once your payment is approved. No account is created.
                   </p>
                 </div>
 
@@ -220,7 +288,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                           <button
                             key={m}
                             type="button"
-                            onClick={() => setMethod(m)}
+                            onClick={() => changeMethod(m)}
                             aria-pressed={active}
                             className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
                               active
@@ -247,6 +315,23 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                   </div>
                 </div>
 
+                {method === 'mobile_money' && currency === 'RWF' && (
+                  <div className="rounded-xl border border-gold/30 bg-gold/5 p-4">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <FaCircleDollarToSlot className="h-4 w-4 text-gold" /> How to pay (RWF)
+                    </p>
+                    <ol className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      <li>1. Send <span className="font-semibold text-slate-700 dark:text-slate-300">{formatPrice(amount, 'RWF')}</span> via Mobile Money to:</li>
+                      <li className="pl-4">• MoMo number: <span className="font-semibold text-slate-700 dark:text-slate-300">{momoNumber || '—'}</span></li>
+                      {momoMerchantCode && (
+                        <li className="pl-4">• Merchant code: <span className="font-semibold text-slate-700 dark:text-slate-300">{momoMerchantCode}</span></li>
+                      )}
+                      <li>2. Then submit this form with the same phone number.</li>
+                      <li>3. The admin verifies receipt and unlocks your email.</li>
+                    </ol>
+                  </div>
+                )}
+
                 {method === 'mobile_money' && (
                   <div>
                     <label className="label" htmlFor="checkout-phone">
@@ -262,11 +347,16 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                       placeholder="e.g. +250 7xx xxx xxx"
                       autoComplete="tel"
                     />
-                    {momoNumber && (
-                      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                        Send payment to <span className="font-semibold text-slate-600 dark:text-slate-300">{momoNumber}</span>
-                      </p>
-                    )}
+                  </div>
+                )}
+
+                {method === 'card' && currency === 'USD' && (
+                  <div className="rounded-xl border border-gold/30 bg-gold/5 p-4">
+                    <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      Pay <span className="font-semibold text-slate-700 dark:text-slate-300">{formatPrice(amount, 'USD')}</span> via
+                      international card / bank transfer, then submit this form. The admin verifies receipt and unlocks
+                      your email. Our card details are shared after you submit.
+                    </p>
                   </div>
                 )}
 
@@ -276,11 +366,11 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
 
                 <button type="submit" disabled={submitting || methods.length === 0} className="btn-primary w-full">
                   <FiLock className="h-4 w-4" />
-                  {submitting ? 'Processing…' : `Pay ${amount > 0 ? formatMoney(amount) : 'Free'}`}
+                  {submitting ? 'Submitting…' : `Submit ${formatPrice(amount, currency)}`}
                 </button>
 
                 <p className="text-center text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
-                  By completing this payment you agree to the site's terms. Payments are processed without creating an account.
+                  Access unlocks after the admin approves your payment. No account or login required.
                 </p>
               </form>
             )}
