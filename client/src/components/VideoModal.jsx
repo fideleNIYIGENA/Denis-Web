@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FaXmark, FaYoutube } from 'react-icons/fa6';
+import ContentInteractions from './ContentInteractions.jsx';
 
 /** Modal that embeds a YouTube video (autoplay) with a "watch on YouTube" link. */
 export default function VideoModal({ video, onClose }) {
@@ -68,6 +69,12 @@ export default function VideoModal({ video, onClose }) {
             >
               <FaYoutube className="h-4 w-4" /> Watch on YouTube
             </a>
+          </div>
+
+          {video.description && <p className="mt-2 text-sm leading-relaxed text-slate-300">{video.description}</p>}
+
+          <div className="mt-4">
+            <ContentInteractions contentType="video" contentId={video.id} />
           </div>
         </motion.div>
       </motion.div>

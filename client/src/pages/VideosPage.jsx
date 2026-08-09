@@ -5,8 +5,10 @@ import useSEO from '../hooks/useSEO.js';
 import PageHeader from '../components/PageHeader.jsx';
 import VideoCard from '../components/VideoCard.jsx';
 import VideoModal from '../components/VideoModal.jsx';
+import PremiumGate from '../components/PremiumGate.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Loader from '../components/Loader.jsx';
+import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 
 export default function VideosPage() {
   useSEO({
@@ -15,6 +17,7 @@ export default function VideosPage() {
     url: window.location.href,
   });
 
+  const { isAuthenticated, isSubscribed } = useUserAuth();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -22,6 +25,7 @@ export default function VideosPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [playing, setPlaying] = useState(null);
+  const [premiumLocked, setPremiumLocked] = useState(false);
 
   const fetchVideos = useCallback(async () => {
     setLoading(true);
@@ -55,8 +59,13 @@ export default function VideosPage() {
   };
 
   // Opening a video starts playback: record the view server-side and bump the
-  // local counter so the card reflects it immediately.
+  // local counter so the card reflects it immediately. FREE videos play for
+  // everyone; PREMIUM videos require a signed-in, subscribed user.
   const openVideo = (video) => {
+    if (video.is_free === false && !(isAuthenticated && isSubscribed)) {
+      setPremiumLocked(true);
+      return;
+    }
     setPlaying(video);
     api.post(`/videos/${video.id}/view`).catch(() => {});
     setVideos((list) =>
@@ -127,6 +136,7 @@ export default function VideosPage() {
       </section>
 
       <VideoModal video={playing} onClose={() => setPlaying(null)} />
+      <PremiumGate open={premiumLocked} onClose={() => setPremiumLocked(false)} contentType="video" />
     </>
   );
 }

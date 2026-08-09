@@ -5,6 +5,7 @@ import App from './App.jsx';
 import './index.css';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import { UserAuthProvider } from './contexts/UserAuthContext.jsx';
 import { DataProvider } from './contexts/DataContext.jsx';
 import { CurrencyProvider } from './contexts/CurrencyContext.jsx';
 import { AudioProvider } from './contexts/AudioContext.jsx';
@@ -15,15 +16,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <ToastProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <DataProvider>
-              <CurrencyProvider>
-                <AudioProvider>
+<AuthProvider>
+<UserAuthProvider>
+<DataProvider>
+<CurrencyProvider>
+<AudioProvider>
                   <App />
-                </AudioProvider>
-              </CurrencyProvider>
-            </DataProvider>
-          </AuthProvider>
+</AudioProvider>
+</CurrencyProvider>
+</DataProvider>
+</UserAuthProvider>
+</AuthProvider>
         </ThemeProvider>
       </ToastProvider>
     </BrowserRouter>

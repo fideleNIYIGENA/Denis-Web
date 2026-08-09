@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FiArrowRight, FiLock, FiMusic } from 'react-icons/fi';
+import { FiArrowRight, FiMusic } from 'react-icons/fi';
 import SocialLinks from './SocialLinks.jsx';
 import { useData } from '../contexts/DataContext.jsx';
 
@@ -111,12 +111,7 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-x flex flex-col items-center justify-between gap-3 py-5 text-xs text-slate-500 sm:flex-row">
           <p>© {year} Denis Ndayishimiye. All rights reserved.</p>
-          <div className="flex items-center gap-5">
-            <Link to="/privacy" className="transition hover:text-gold">Privacy Policy</Link>
-            <Link to="/admin/login" className="inline-flex items-center gap-1 transition hover:text-gold">
-              <FiLock className="h-3 w-3" /> Admin
-            </Link>
-          </div>
+          <Link to="/privacy" className="transition hover:text-gold">Privacy Policy</Link>
         </div>
       </div>
     </footer>

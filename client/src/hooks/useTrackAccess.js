@@ -1,86 +1,42 @@
 import { useCallback, useState } from 'react';
-import api from '../api/client.js';
-import { getPayerEmail, setPayerEmail } from '../lib/purchases.js';
-
-const isPaid = (song) =>
-  !!song && song.is_free !== true && (Number(song.price_rwf || 0) > 0 || Number(song.price_usd || 0) > 0);
+import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 
 /**
- * Email-based access gate for paid tracks.
+ * Subscription-based access gate for music.
  *
- * - `requestPlay()`: free tracks play immediately; paid tracks run the email
- *   verification flow (prompt for email → POST /payments/verify-email →
- *   completed / pending / unpaid).
- * - After a successful verification the track is unlocked on this device and
- *   playback is triggered automatically via the returned `playSignal`.
- * - `verifyOpen` / `checkoutOpen` drive the VerifyModal / CheckoutModal that
- *   the calling card renders.
+ * Access rules (enforced in the UI and on the API):
+ *  - FREE content (`is_free === true`) plays for everyone, no login needed.
+ *  - PREMIUM content (`is_free === false`) requires a signed-in user with an
+ *    active subscription. Otherwise the caller shows the premium prompt.
+ *
+ * `requestPlay()` starts playback when access is allowed, or opens the
+ * premium gate when the visitor is not logged in / not subscribed.
  */
 export default function useTrackAccess(song) {
+  const { isAuthenticated, isSubscribed } = useUserAuth();
   const id = song?.id;
-  const paid = isPaid(song);
 
-  const [allowed, setAllowed] = useState(!paid);
-  const [verifyOpen, setVerifyOpen] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState('');
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const premium = song?.is_free === false;
+  const allowed = !premium || (isAuthenticated && isSubscribed);
+  const locked = premium && !allowed;
+
+  const [gateOpen, setGateOpen] = useState(false);
   const [playSignal, setPlaySignal] = useState(0);
 
-  const openVerify = useCallback((message = '') => {
-    setPendingMessage(message);
-    setVerifyOpen(true);
-  }, []);
-
-  const unlockAndPlay = useCallback(() => {
-    setAllowed(true);
-    setPlaySignal((n) => n + 1);
-  }, []);
-
-  const verify = useCallback(
-    async (email) => {
-      const { data } = await api.post('/payments/verify-email', { email, track_id: id });
-      return data;
-    },
-    [id]
-  );
-
-  const requestPlay = useCallback(async () => {
-    if (!paid) {
-      unlockAndPlay();
-      return;
+  const requestPlay = useCallback(() => {
+    if (allowed) {
+      setPlaySignal((n) => n + 1);
+    } else {
+      setGateOpen(true);
     }
-    const email = getPayerEmail();
-    if (!email) {
-      openVerify();
-      return;
-    }
-    try {
-      const data = await verify(email);
-      if (data.valid) {
-        setPayerEmail(email);
-        unlockAndPlay();
-      } else if (data.status === 'pending') {
-        openVerify(data.message || 'Your payment is awaiting admin approval.');
-      } else {
-        setCheckoutOpen(true);
-      }
-    } catch {
-      openVerify();
-    }
-  }, [paid, verify, openVerify, unlockAndPlay]);
+  }, [allowed]);
 
   return {
-    paid,
-    allowed,
-    locked: paid && !allowed,
-    verifyOpen,
-    pendingMessage,
-    checkoutOpen,
+    premium,
+    locked,
+    gateOpen,
+    setGateOpen,
     playSignal,
-    openVerify,
-    setCheckoutOpen,
-    verify,
-    unlockAndPlay,
     requestPlay,
   };
 }

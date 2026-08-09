@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FiMenu, FiX, FiMoon, FiSun, FiMusic } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa6';
+import { FaCrown, FaRightFromBracket, FaUser } from 'react-icons/fa6';
 import { useTheme } from '../contexts/ThemeContext.jsx';
-import { useCurrency } from '../contexts/CurrencyContext.jsx';
+import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 import CheckoutModal from './CheckoutModal.jsx';
 
 const LINKS = [
@@ -21,7 +21,7 @@ const LINKS = [
 
 export default function Navbar() {
   const { dark, toggle } = useTheme();
-  const { currency, setCurrency } = useCurrency();
+  const { isAuthenticated, isSubscribed, profile, logout } = useUserAuth();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
@@ -88,39 +88,60 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2">
-          {/* Currency toggle (RWF / USD) */}
-          <div
-            className={`flex items-center rounded-full p-0.5 transition ${
-              transparent ? 'bg-white/10' : 'bg-slate-100 dark:bg-white/10'
-            }`}
-          >
-            {['RWF', 'USD'].map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCurrency(c)}
-                aria-pressed={currency === c}
-                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                  currency === c
-                    ? 'bg-gold-gradient text-night shadow'
-                    : transparent
-                      ? 'text-white/70 hover:text-gold'
-                      : 'text-slate-500 hover:text-gold dark:text-slate-400'
+          {/* Account + Subscribe (desktop) */}
+          <div className="hidden items-center gap-2 lg:flex">
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/account"
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition ${
+                    transparent ? 'text-white/80 hover:text-gold' : 'text-slate-600 hover:text-royal dark:text-slate-300 dark:hover:text-royal-300'
+                  }`}
+                >
+                  <FaUser className="h-3.5 w-3.5" /> My Account
+                </Link>
+                <button
+                  type="button"
+                  onClick={logout}
+                  aria-label="Logout"
+                  title="Logout"
+                  className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+                    transparent
+                      ? 'text-white/80 hover:bg-white/10 hover:text-red-400'
+                      : 'text-slate-500 hover:bg-red-500/10 hover:text-red-500 dark:text-slate-400'
+                  }`}
+                >
+                  <FaRightFromBracket className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                  transparent ? 'text-white/80 hover:text-gold' : 'text-slate-600 hover:text-gold dark:text-slate-300 dark:hover:text-gold'
                 }`}
               >
-                {c}
-              </button>
-            ))}
-          </div>
+                Login
+              </Link>
+            )}
 
-          {/* Subscribe (guest checkout, no account needed) */}
-          <button
-            type="button"
-            onClick={() => setSubOpen(true)}
-            className="hidden items-center gap-2 rounded-full bg-gold-gradient px-4 py-2 text-sm font-semibold text-night shadow-glow transition hover:brightness-110 lg:inline-flex"
-          >
-            <FaCrown className="h-3.5 w-3.5" /> Subscribe
-          </button>
+            {isAuthenticated ? (
+              <Link
+                to="/subscribe"
+                className="flex items-center gap-2 rounded-full bg-gold-gradient px-4 py-2 text-sm font-semibold text-night shadow-glow transition hover:brightness-110"
+              >
+                <FaCrown className="h-3.5 w-3.5" /> {isSubscribed ? 'Subscribed' : 'Subscribe'}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSubOpen(true)}
+                className="flex items-center gap-2 rounded-full bg-gold-gradient px-4 py-2 text-sm font-semibold text-night shadow-glow transition hover:brightness-110"
+              >
+                <FaCrown className="h-3.5 w-3.5" /> Subscribe
+              </button>
+            )}
+          </div>
 
           {/* Theme toggle */}
           <button
@@ -165,35 +186,58 @@ export default function Navbar() {
             className="overflow-hidden border-b border-white/10 bg-white/95 backdrop-blur-xl dark:bg-night/95 xl:hidden"
           >
             <ul className="container-x flex flex-col gap-1 py-4">
-              <li className="mb-1 flex items-center gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/10">
-                <span className="pl-3 text-xs font-bold uppercase tracking-wide text-slate-400">Currency</span>
-                {['RWF', 'USD'].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCurrency(c)}
-                    aria-pressed={currency === c}
-                    className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${
-                      currency === c ? 'bg-gold-gradient text-night' : 'text-slate-500 hover:text-gold dark:text-slate-400'
-                    }`}
+              {isAuthenticated ? (
+                <li className="mb-1 flex items-center gap-2">
+                  <NavLink
+                    to="/account"
+                    className="flex flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:text-royal dark:bg-white/10 dark:text-slate-200"
                   >
-                    {c}
+                    <FaUser className="h-4 w-4" /> My Account
+                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-red-500/10 hover:text-red-500 dark:bg-white/10 dark:text-slate-300"
+                  >
+                    <FaRightFromBracket className="h-4 w-4" /> Logout
                   </button>
-                ))}
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSubOpen(true);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-night"
-                >
-                  <FaCrown className="h-4 w-4" />
-                  Subscribe
-                </button>
-              </li>
+                </li>
+              ) : (
+                <li className="mb-1">
+                  <NavLink
+                    to="/login"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:text-royal dark:bg-white/10 dark:text-slate-200"
+                  >
+                    Login
+                  </NavLink>
+                </li>
+              )}
+              {isAuthenticated ? (
+                <li>
+                  <NavLink
+                    to="/subscribe"
+                    onClick={() => setOpen(false)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-night"
+                  >
+                    <FaCrown className="h-4 w-4" />
+                    {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                  </NavLink>
+                </li>
+              ) : (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubOpen(true);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-night"
+                  >
+                    <FaCrown className="h-4 w-4" />
+                    Subscribe
+                  </button>
+                </li>
+              )}
               {LINKS.map((link) => (
                 <li key={link.to}>
                   <NavLink
@@ -218,7 +262,12 @@ export default function Navbar() {
       </AnimatePresence>
       </header>
 
-      <CheckoutModal open={subOpen} onClose={() => setSubOpen(false)} type="subscription" />
+      <CheckoutModal
+        open={subOpen}
+        onClose={() => setSubOpen(false)}
+        type="subscription"
+        lockedEmail={isAuthenticated ? profile?.email || '' : ''}
+      />
     </>
   );
 }

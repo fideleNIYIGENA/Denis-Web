@@ -16,6 +16,7 @@ const EMPTY = {
   duration: '',
   is_short: false,
   featured: false,
+  is_free: true,
 };
 
 export default function AdminVideos() {
@@ -69,6 +70,7 @@ export default function AdminVideos() {
       duration: v.duration ? String(v.duration) : '',
       is_short: !!v.is_short,
       featured: !!v.featured,
+      is_free: v.is_free !== false,
     });
     setThumbFile(null);
     setModalOpen(true);
@@ -165,6 +167,7 @@ export default function AdminVideos() {
                         <FaStar className="h-2.5 w-2.5" /> Featured
                       </span>
                     )}
+                    {v.is_free === false && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold uppercase text-gold">Premium</span>}
                     {v.is_short && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-500">Short</span>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{v.youtube_url}</p>
@@ -213,6 +216,12 @@ export default function AdminVideos() {
             <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-300 px-4 dark:border-white/10">
               <input name="featured" type="checkbox" checked={form.featured} onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))} className="h-4 w-4 accent-gold" />
               <span className="text-sm text-slate-600 dark:text-slate-300">Show on the home page</span>
+            </label>
+          </FormField>
+          <FormField label="Access">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-300 px-4 dark:border-white/10">
+              <input name="is_free" type="checkbox" checked={form.is_free} onChange={(e) => setForm((f) => ({ ...f, is_free: e.target.checked }))} className="h-4 w-4 accent-gold" />
+              <span className="text-sm text-slate-600 dark:text-slate-300">Free — everyone can watch (unchecked = Premium)</span>
             </label>
           </FormField>
           <div className="sm:col-span-2">

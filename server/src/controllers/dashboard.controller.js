@@ -28,6 +28,13 @@ export const getStats = asyncHandler(async (req, res) => {
     .limit(5);
   if (recentError) return res.status(500).json({ success: false, message: recentError.message });
 
+  // Real account count from public.profiles, which mirrors Supabase Auth
+  // (a trigger creates a profile row for every signup). Never hardcoded.
+  const { count: totalAccounts, error: accountsError } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true });
+  if (accountsError) return res.status(500).json({ success: false, message: accountsError.message });
+
   return res.json({
     success: true,
     data: {
@@ -37,6 +44,7 @@ export const getStats = asyncHandler(async (req, res) => {
       totalEvents: counts.events,
       totalNews: counts.news,
       totalMessages: counts.messages,
+      totalAccounts: totalAccounts || 0,
       unreadMessages: unread || 0,
       recentMessages: recentMessages || [],
     },

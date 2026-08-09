@@ -279,6 +279,7 @@ alter table public.songs add column if not exists is_free    boolean not null de
 alter table public.songs add column if not exists play_count integer not null default 0;
 
 alter table public.videos add column if not exists view_count integer not null default 0;
+alter table public.videos add column if not exists is_free    boolean not null default true;
 
 alter table public.events add column if not exists ticket_price_rwf numeric(12,2) not null default 0;
 alter table public.events add column if not exists ticket_price_usd numeric(12,2) not null default 0;

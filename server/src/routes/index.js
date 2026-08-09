@@ -11,6 +11,8 @@ import settingsRoutes from './settings.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import paymentRoutes from './payments.routes.js';
 import adminRoutes from './admin.routes.js';
+import userRoutes from './users.routes.js';
+import interactionRoutes from './interactions.routes.js';
 
 const router = Router();
 
@@ -28,5 +30,7 @@ router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
+router.use('/users', userRoutes);
+router.use('/', interactionRoutes);
 
 export default router;

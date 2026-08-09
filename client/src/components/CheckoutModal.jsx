@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { FaMobileScreenButton, FaCreditCard, FaXmark, FaClockRotateLeft, FaCircleDollarToSlot } from 'react-icons/fa6';
 import { FiLock } from 'react-icons/fi';
 import api from '../api/client.js';
+import { supabase } from '../lib/supabase.js';
 import { getPayerEmail, setPayerEmail } from '../lib/purchases.js';
 import { formatPrice } from '../lib/format.js';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
@@ -30,14 +31,19 @@ function amountsFor(type, item, subRwf, subUsd) {
 }
 
 /**
- * Guest checkout modal — no account needed.
+ * Checkout modal — submits a PENDING payment for admin approval.
+ *
+ * - Works as a guest checkout with no account (existing behaviour).
+ * - When `lockedEmail` is provided (a signed-in public user), the email field
+ *   is locked to the account email and the request carries the Supabase token
+ *   so the backend links the payment to the user.
  *
  * The visitor chooses RWF (local Mobile Money) or USD (card / international
  * transfer), enters their email + phone, and submits. Every purchase starts as
  * PENDING and only unlocks once the admin verifies receipt of funds and
  * approves it in the Admin Dashboard.
  */
-export default function CheckoutModal({ open, onClose, type = 'subscription', item = null, onSuccess }) {
+export default function CheckoutModal({ open, onClose, type = 'subscription', item = null, onSuccess, lockedEmail = '' }) {
   const { currency, setCurrency } = useCurrency();
 
   const [methods, setMethods] = useState([]);
@@ -59,7 +65,7 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
     setError('');
     setResult(null);
     setSubmitting(false);
-    setEmail(getPayerEmail() || '');
+    setEmail(lockedEmail || getPayerEmail() || '');
     setPhone('');
 
     const onKey = (e) => {
@@ -136,7 +142,17 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
       if (method === 'mobile_money') payload.phone = phone.trim();
       if (item?.id) payload.item_id = item.id;
 
-      const res = await api.post('/payments/checkout', payload);
+      // A signed-in public user's token lets the backend link this payment to
+      // their account (the backend still uses the verified email, never ours).
+      let headers;
+      if (supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.access_token) {
+          headers = { Authorization: `Bearer ${sessionData.session.access_token}` };
+        }
+      }
+
+      const res = await api.post('/payments/checkout', payload, { headers });
       setPayerEmail(email.trim());
       setResult(res.data);
       onSuccess?.(res.data);
@@ -262,15 +278,22 @@ export default function CheckoutModal({ open, onClose, type = 'subscription', it
                     id="checkout-email"
                     type="email"
                     required
+                    readOnly={Boolean(lockedEmail)}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="input"
                     placeholder="you@example.com"
                     autoComplete="email"
                   />
-                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                    Your email is used to verify access once your payment is approved. No account is created.
-                  </p>
+                  {lockedEmail ? (
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                      Using your account email — approval unlocks your subscription automatically.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                      Your email is used to verify access once your payment is approved. No account is created.
+                    </p>
+                  )}
                 </div>
 
                 <div>

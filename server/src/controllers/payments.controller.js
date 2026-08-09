@@ -63,7 +63,12 @@ export const getPaymentSettings = asyncHandler(async (req, res) => {
  * approve it before the buyer's email is unlocked.
  */
 export const checkout = asyncHandler(async (req, res) => {
-  const email = cleanText(req.body.email, 200).toLowerCase();
+  // When a public user is signed in, their identity comes from the verified
+  // Supabase JWT — never trust the email/phone the browser sends.
+  const email = req.user?.email
+    ? cleanText(req.user.email, 200).toLowerCase()
+    : cleanText(req.body.email, 200).toLowerCase();
+  const userId = req.user?.id || null;
   const phone = cleanText(req.body.phone, 50) || null;
   const paymentMethod = cleanText(req.body.payment_method, 30);
   const paymentType = cleanText(req.body.payment_type, 30);
@@ -172,6 +177,7 @@ export const checkout = asyncHandler(async (req, res) => {
     .insert({
       payer_email: email,
       payer_phone: phone,
+      user_id: userId,
       payment_method: paymentMethod,
       amount,
       currency,

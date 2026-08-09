@@ -1,4 +1,4 @@
-import { FaPlay, FaStar, FaEye } from 'react-icons/fa6';
+import { FaPlay, FaStar, FaEye, FaCrown } from 'react-icons/fa6';
 import { motion } from 'framer-motion';
 import LazyImage from './LazyImage.jsx';
 import { formatNumber } from '../lib/format.js';
@@ -41,6 +41,11 @@ export default function VideoCard({ video, index = 0, onPlay }) {
           {video.featured && (
             <span className="flex items-center gap-1 rounded-full bg-gold-gradient px-3 py-1 text-[11px] font-bold text-night">
               <FaStar className="h-3 w-3" /> Featured
+            </span>
+          )}
+          {video.is_free === false && (
+            <span className="flex items-center gap-1 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-gold backdrop-blur">
+              <FaCrown className="h-3 w-3" /> Premium
             </span>
           )}
         </div>

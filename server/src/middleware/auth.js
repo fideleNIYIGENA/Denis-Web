@@ -14,6 +14,11 @@ export function authRequired(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Only tokens issued by the admin login carry the 'admin' role. This
+    // guarantees a public-user token can never reach an admin handler.
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
     req.admin = { id: decoded.id, email: decoded.email };
     return next();
   } catch (err) {

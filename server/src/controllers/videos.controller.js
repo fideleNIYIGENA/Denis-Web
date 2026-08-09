@@ -72,6 +72,7 @@ export const createVideo = asyncHandler(async (req, res) => {
     duration: duration ?? 0,
     is_short: isShort,
     featured: req.body.featured === 'true' || req.body.featured === true,
+    is_free: req.body.is_free === 'false' || req.body.is_free === false ? false : true,
   };
 
   const { data, error } = await supabase.from('videos').insert(payload).select().single();
@@ -93,6 +94,7 @@ export const updateVideo = asyncHandler(async (req, res) => {
   if (req.body.duration) payload.duration = parseDuration(req.body.duration) ?? existing.duration;
   if (req.body.featured !== undefined) payload.featured = req.body.featured === 'true' || req.body.featured === true;
   if (req.body.is_short !== undefined) payload.is_short = req.body.is_short === 'true' || req.body.is_short === true;
+  if (req.body.is_free !== undefined) payload.is_free = req.body.is_free === 'true' || req.body.is_free === true;
 
   if (payload.is_short && payload.duration && payload.duration > 60) {
     return res.status(400).json({ success: false, message: 'Short videos must be at most 1 minute (60 seconds).' });

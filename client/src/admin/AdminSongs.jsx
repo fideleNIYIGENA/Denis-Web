@@ -8,7 +8,6 @@ import ConfirmModal from './components/ConfirmModal.jsx';
 import FormField from './components/FormField.jsx';
 import Loader from '../components/Loader.jsx';
 import Pagination from '../components/Pagination.jsx';
-import { formatPrice } from '../lib/format.js';
 
 const EMPTY = {
   title: '',
@@ -220,9 +219,7 @@ export default function AdminSongs() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {song.genre} • {song.release_date || 'No release date'} •{' '}
-                    {song.is_free
-                      ? 'Free'
-                      : `${formatPrice(song.price_rwf, 'RWF')} / ${formatPrice(song.price_usd, 'USD')}`}{' '}
+                    {song.is_free ? 'Free' : 'Premium'}{' '}
                     • {song.play_count || 0} plays
                   </p>
                 </div>
@@ -260,10 +257,10 @@ export default function AdminSongs() {
               <span className="text-sm text-slate-600 dark:text-slate-300">Show as featured on the home page</span>
             </label>
           </FormField>
-          <FormField label="Free to Listen">
+          <FormField label="Access">
             <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-300 px-4 dark:border-white/10">
               <input name="is_free" type="checkbox" checked={form.is_free} onChange={(e) => setForm((f) => ({ ...f, is_free: e.target.checked }))} className="h-4 w-4 accent-gold" />
-              <span className="text-sm text-slate-600 dark:text-slate-300">Everyone can play this track for free</span>
+              <span className="text-sm text-slate-600 dark:text-slate-300">Free — everyone can play this track (unchecked = Premium)</span>
             </label>
           </FormField>
           <FormField label="Track Price (RWF)" hint={form.is_free ? 'Free tracks are always playable — no price is charged.' : 'Set 0 to make the track free.'}>

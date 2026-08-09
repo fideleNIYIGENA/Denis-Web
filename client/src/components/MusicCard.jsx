@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { FiShare2, FiHeadphones } from 'react-icons/fi';
-import { FaStar } from 'react-icons/fa6';
+import { FaStar, FaCrown } from 'react-icons/fa6';
 import { motion } from 'framer-motion';
 import api from '../api/client.js';
 import LazyImage from './LazyImage.jsx';
 import AudioPlayer from './AudioPlayer.jsx';
 import StreamingLinks from './StreamingLinks.jsx';
-import CheckoutModal from './CheckoutModal.jsx';
-import VerifyModal from './VerifyModal.jsx';
+import ContentInteractions from './ContentInteractions.jsx';
+import PremiumGate from './PremiumGate.jsx';
 import useTrackAccess from '../hooks/useTrackAccess.js';
-import { formatNumber, formatPrice, pickPrice } from '../lib/format.js';
-import { useCurrency } from '../contexts/CurrencyContext.jsx';
+import { formatNumber } from '../lib/format.js';
 
 export function formatDate(date) {
   if (!date) return '';
@@ -34,19 +33,15 @@ async function shareSong(song) {
   }
 }
 
-/** Beautiful song card with cover, meta, player, play count and streaming links. */
+/** Beautiful song card with cover, meta, player, play count and reactions. */
 export default function MusicCard({ song, index = 0 }) {
   const [plays, setPlays] = useState(Number(song.play_count) || 0);
-  const { currency } = useCurrency();
-  const { locked, verifyOpen, pendingMessage, checkoutOpen, playSignal, setCheckoutOpen, unlockAndPlay, requestPlay } =
-    useTrackAccess(song);
+  const { locked, premium, gateOpen, setGateOpen, playSignal, requestPlay } = useTrackAccess(song);
 
   const handleStart = () => {
     setPlays((p) => p + 1);
     api.post(`/songs/${song.id}/play`).catch(() => {});
   };
-
-  const price = pickPrice(song.price_rwf, song.price_usd, currency);
 
   return (
     <motion.article
@@ -96,9 +91,9 @@ export default function MusicCard({ song, index = 0 }) {
               Released {formatDate(song.release_date)}
             </p>
           </div>
-          {locked && (
-            <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold text-gold">
-              {formatPrice(price.amount, price.currency)}
+          {premium && (
+            <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-gold">
+              Premium
             </span>
           )}
         </div>
@@ -118,23 +113,11 @@ export default function MusicCard({ song, index = 0 }) {
         />
 
         <StreamingLinks song={song} compact />
+
+        <ContentInteractions contentType="song" contentId={song.id} />
       </div>
 
-      <VerifyModal
-        open={verifyOpen}
-        onClose={() => setVerifyOpen(false)}
-        trackId={song.id}
-        initialMessage={pendingMessage}
-        onVerified={() => {
-          setVerifyOpen(false);
-          unlockAndPlay();
-        }}
-        onUnpaid={() => {
-          setVerifyOpen(false);
-          setCheckoutOpen(true);
-        }}
-      />
-      <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} type="track_buy" item={song} />
+      <PremiumGate open={gateOpen} onClose={() => setGateOpen(false)} contentType="song" />
     </motion.article>
   );
 }

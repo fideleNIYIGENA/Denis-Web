@@ -10,6 +10,7 @@ import {
   FaNewspaper,
   FaSackDollar,
   FaHeadphones,
+  FaUsersLine,
   FaCheck,
   FaXmark,
   FaClockRotateLeft,
@@ -118,6 +119,7 @@ export default function AdminDashboard() {
   if (!stats) return <Loader />;
 
   const cards = [
+    { icon: FaUsersLine, label: 'Total Accounts', value: stats.totalAccounts, to: '/admin/accounts' },
     { icon: FaMusic, label: 'Total Songs', value: stats.totalSongs, to: '/admin/songs' },
     { icon: FaVideo, label: 'Total Videos', value: stats.totalVideos, to: '/admin/videos' },
     { icon: FaCalendarDays, label: 'Total Events', value: stats.totalEvents, to: '/admin/events' },

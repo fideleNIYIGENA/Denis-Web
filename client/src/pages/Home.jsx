@@ -11,9 +11,11 @@ import MusicCard from '../components/MusicCard.jsx';
 import VideoCard from '../components/VideoCard.jsx';
 import EventCard from '../components/EventCard.jsx';
 import VideoModal from '../components/VideoModal.jsx';
+import PremiumGate from '../components/PremiumGate.jsx';
 import Newsletter from '../components/Newsletter.jsx';
 import Loader from '../components/Loader.jsx';
 import LazyImage from '../components/LazyImage.jsx';
+import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 
 const PLATFORM_STRIP = [
   { key: 'spotify', label: 'Spotify' },
@@ -34,12 +36,14 @@ const PUBLIC_LINKS = [
 export default function Home() {
   useSEO({});
   const { settings, social, error: sharedDataError } = useData();
+  const { isAuthenticated, isSubscribed } = useUserAuth();
   const [songs, setSongs] = useState([]);
   const [songsLoading, setSongsLoading] = useState(true);
   const [video, setVideo] = useState(null);
   const [events, setEvents] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null);
+  const [premiumLocked, setPremiumLocked] = useState(false);
   const [contentError, setContentError] = useState(false);
 
   useEffect(() => {
@@ -72,7 +76,12 @@ export default function Home() {
   }, []);
 
   // Playback starts when the video opens: record the view and bump the counter.
+  // FREE videos play for everyone; PREMIUM videos need a signed-in subscriber.
   const openVideo = (video) => {
+    if (video.is_free === false && !(isAuthenticated && isSubscribed)) {
+      setPremiumLocked(true);
+      return;
+    }
     setPlayingVideo(video);
     api.post(`/videos/${video.id}/view`).catch(() => {});
     setVideo((cur) => (cur?.id === video.id ? { ...cur, view_count: (cur.view_count || 0) + 1 } : cur));
@@ -385,6 +394,8 @@ export default function Home() {
 
       {/* ------------------------------ NEWSLETTER ------------------------------ */}
       <Newsletter />
+
+      <PremiumGate open={premiumLocked} onClose={() => setPremiumLocked(false)} contentType="video" />
     </>
   );
 }
