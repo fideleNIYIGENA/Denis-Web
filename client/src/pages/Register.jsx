@@ -19,7 +19,7 @@ function friendlySignupError(err) {
 
 export default function Register() {
   useSEO({ title: 'Create Account', description: 'Create a free account to like, comment and interact.' });
-  const { register, configError } = useUserAuth();
+  const { register, checkEmail, configError } = useUserAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +53,12 @@ export default function Register() {
 
     setLoading(true);
     try {
+      const emailTaken = await checkEmail(email.trim());
+      if (emailTaken) {
+        setError('An account with this email already exists. Please log in instead.');
+        return;
+      }
+
       const data = await register(email.trim(), password);
       // When email confirmation is enabled, Supabase returns a user without a
       // session until the confirmation link is clicked.

@@ -85,6 +85,11 @@ export function UserAuthProvider({ children }) {
     return data;
   }, [configError]);
 
+  const checkEmail = useCallback(async (email) => {
+    const res = await userApi.post('/users/check-email', { email });
+    return res.data.exists;
+  }, []);
+
   const login = useCallback(async (email, password) => {
     if (!supabase) throw new Error(configError || 'Authentication is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -127,6 +132,7 @@ export function UserAuthProvider({ children }) {
         isSubscribed,
         refreshProfile,
         register,
+        checkEmail,
         login,
         logout,
         resetPassword,

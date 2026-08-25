@@ -1,6 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { cleanText } from '../middleware/validate.js';
+import { cleanText, isEmail } from '../middleware/validate.js';
 import { getUserSubscription } from '../utils/subscription.js';
 
 /** Shape of the profile object returned to the client. */
@@ -54,6 +54,32 @@ export const getProfile = asyncHandler(async (req, res) => {
     success: true,
     data: { profile: publicProfile(profileRow), subscription },
   });
+});
+
+/**
+ * POST /api/users/check-email
+ * Public endpoint (no auth required). Checks whether an email address
+ * is already registered. Returns { exists: true | false }.
+ * The comparison is case-insensitive (lowercased before lookup).
+ */
+export const checkEmailExists = asyncHandler(async (req, res) => {
+  const email = (req.body?.email || '').trim().toLowerCase();
+
+  if (!email || !isEmail(email)) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('email', email)
+    .limit(1);
+
+  if (error) {
+    return res.status(500).json({ success: false, message: 'Could not verify email.' });
+  }
+
+  return res.json({ success: true, exists: data.length > 0 });
 });
 
 /**
