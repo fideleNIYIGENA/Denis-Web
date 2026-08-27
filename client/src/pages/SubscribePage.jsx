@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
-import { FaCrown, FaCircleCheck, FaClockRotateLeft, FaCircleXmark, FaRightToBracket, FaUserPlus } from 'react-icons/fa6';
+import { Link } from 'react-router-dom';
+import { FaCrown, FaCircleCheck, FaHourglassHalf, FaRightToBracket, FaUserPlus, FaRotateRight } from 'react-icons/fa6';
 import PageHeader from '../components/PageHeader.jsx';
 import CheckoutModal from '../components/CheckoutModal.jsx';
+import SubscriptionCard from '../components/SubscriptionCard.jsx';
 import api from '../api/client.js';
 import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
@@ -11,7 +12,8 @@ import useSEO from '../hooks/useSEO.js';
 
 export default function SubscribePage() {
   useSEO({ title: 'Subscribe', description: 'Subscribe to unlock interactive features.' });
-  const { isAuthenticated, loading, profile, subscription, refreshProfile } = useUserAuth();
+  const { isAuthenticated, loading, profileLoading, profileError, profile, subscription, refreshProfile } =
+    useUserAuth();
   const { currency, setCurrency } = useCurrency();
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -29,7 +31,28 @@ export default function SubscribePage() {
       .catch(() => {});
   }, []);
 
-  if (loading) return null;
+  if (loading || (isAuthenticated && profileLoading)) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="Membership"
+          title="Subscribe"
+          subtitle="Unlock likes, comments and subscriber-only interactions."
+          breadcrumb={[{ label: 'Subscribe', to: '/subscribe' }]}
+        />
+        <section className="py-16">
+          <div className="container-x mx-auto max-w-xl">
+            <div className="card p-8">
+              <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                <FaHourglassHalf className="h-4 w-4 animate-pulse text-gold" />
+                <span>Checking your subscription status…</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -66,6 +89,8 @@ export default function SubscribePage() {
   }
 
   const active = subscription.status === 'active';
+  const expired = subscription.status === 'expired';
+  const inactive = subscription.status === 'inactive' || subscription.status === 'cancelled';
 
   return (
     <>
@@ -80,60 +105,12 @@ export default function SubscribePage() {
         <div className="container-x">
           <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-2">
             {/* Current status */}
-            <div className="card p-8">
-              <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">Your Subscription</h2>
-
-              <div className="mt-6 space-y-4 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500 dark:text-slate-400">Account</span>
-                  <span className="truncate font-semibold text-slate-800 dark:text-slate-200">{profile?.email}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500 dark:text-slate-400">Status</span>
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase ${
-                      active
-                        ? 'bg-royal/15 text-royal-500'
-                        : subscription.status === 'pending'
-                          ? 'bg-gold/15 text-gold'
-                          : 'bg-red-500/15 text-red-500'
-                    }`}
-                  >
-                    {active ? <FaCircleCheck className="h-3 w-3" /> : <FaClockRotateLeft className="h-3 w-3" />}
-                    {active ? 'Active' : subscription.status === 'pending' ? 'Pending Approval' : subscription.status}
-                  </span>
-                </div>
-                {subscription.expires_at && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-slate-500 dark:text-slate-400">Expires</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {new Date(subscription.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6">
-                {active ? (
-                  <p className="rounded-xl bg-royal/10 px-4 py-3 text-sm font-medium text-royal-500">
-                    You're subscribed! You can like and comment on songs and videos.
-                  </p>
-                ) : subscription.status === 'pending' ? (
-                  <p className="rounded-xl bg-gold/10 px-4 py-3 text-sm font-medium text-gold">
-                    Your payment is awaiting admin approval. You'll be unlocked as soon as it's confirmed.
-                  </p>
-                ) : (
-                  <p className="flex items-start gap-2 rounded-xl bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
-                    <FaCircleXmark className="mt-0.5 h-4 w-4 shrink-0" />
-                    Subscribing is required before you can like, dislike or comment.
-                  </p>
-                )}
-              </div>
-
-              <Link to="/account" className="mt-6 inline-flex text-sm font-semibold text-gold transition hover:brightness-125">
-                Back to My Account →
-              </Link>
-            </div>
+            <SubscriptionCard
+              subscription={subscription}
+              loading={profileLoading}
+              error={profileError}
+              onRenew={() => setCheckoutOpen(true)}
+            />
 
             {/* Pricing + checkout */}
             <div className="card relative overflow-hidden p-8">
@@ -149,7 +126,7 @@ export default function SubscribePage() {
                   <FaCrown className="h-3 w-3" /> Full Access
                 </span>
                 <h2 className="mt-4 font-display text-2xl font-bold text-slate-900 dark:text-white">
-                  {active ? 'Extend your subscription' : 'Become a subscriber'}
+                  {active ? 'Extend your subscription' : expired ? 'Renew subscription' : 'Become a subscriber'}
                 </h2>
 
                 <div className="mt-4 flex items-center rounded-full bg-slate-100 p-0.5 dark:bg-white/10">
@@ -184,14 +161,22 @@ export default function SubscribePage() {
                   type="button"
                   onClick={() => setCheckoutOpen(true)}
                   className="btn-primary mt-8 w-full"
-                  disabled={active}
                 >
-                  <FaCrown className="h-4 w-4" />
-                  {active ? 'Already Subscribed' : `Subscribe — ${formatPrice(currency === 'USD' ? subUsd : subRwf, currency)}`}
+                  {expired || inactive ? (
+                    <FaRotateRight className="h-4 w-4" />
+                  ) : (
+                    <FaCrown className="h-4 w-4" />
+                  )}
+                  {expired
+                    ? `Renew — ${formatPrice(currency === 'USD' ? subUsd : subRwf, currency)}`
+                    : active
+                      ? 'Extend Subscription'
+                      : `Subscribe — ${formatPrice(currency === 'USD' ? subUsd : subRwf, currency)}`}
                 </button>
 
                 <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
-                  Payment starts as pending and is unlocked after the admin confirms receipt. {active && 'Use checkout to extend when your subscription expires.'}
+                  Payment starts as pending and is unlocked after the admin confirms receipt. An existing active
+                  subscription prevents a duplicate checkout.
                 </p>
               </div>
             </div>

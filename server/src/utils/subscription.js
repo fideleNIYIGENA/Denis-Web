@@ -19,7 +19,6 @@ function toRow(row) {
   if (!row) return null;
   return {
     payment_id: row.id,
-    status: row.status,
     amount: Number(row.amount) || 0,
     currency: row.currency || 'RWF',
     started_at: row.created_at || null,

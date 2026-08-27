@@ -19,6 +19,12 @@ export function UserAuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // True while the profile (incl. subscription status) is being fetched after
+  // a session is available — lets the UI show a loading state instead of
+  // briefly flashing "Subscribe" to an already-subscribed user.
+  const [profileLoading, setProfileLoading] = useState(false);
+  // Friendly error surfaced when the backend profile/subscription cannot load.
+  const [profileError, setProfileError] = useState('');
   const [configError, setConfigError] = useState(
     isSupabaseConfigured ? '' : 'Public accounts are not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'
   );
@@ -26,8 +32,12 @@ export function UserAuthProvider({ children }) {
   const refreshProfile = useCallback(async () => {
     if (!session) {
       setCurrentUser(null);
+      setProfileError('');
+      setProfileLoading(false);
       return null;
     }
+    setProfileLoading(true);
+    setProfileError('');
     try {
       const res = await userApi.get('/users/profile');
       const data = res.data.data;
@@ -35,12 +45,18 @@ export function UserAuthProvider({ children }) {
       return data;
     } catch (err) {
       if (err.response?.status === 401) {
+        // Session token became invalid — profile is simply not available.
         setCurrentUser(null);
         return null;
       }
-      // Network / server errors keep the session but no profile data.
+      // Network / server errors keep the session but no profile data. We make
+      // sure the UI doesn't wrongly show "Subscribe" as if there were no
+      // subscription — the caller can surface `profileError`.
       setCurrentUser(null);
+      setProfileError('Could not load your account and subscription details. Please try again.');
       return null;
+    } finally {
+      setProfileLoading(false);
     }
   }, [session]);
 
@@ -127,6 +143,8 @@ export function UserAuthProvider({ children }) {
         profile: currentUser?.profile || null,
         subscription,
         loading,
+        profileLoading,
+        profileError,
         configError,
         isAuthenticated,
         isSubscribed,

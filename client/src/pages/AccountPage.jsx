@@ -10,11 +10,13 @@ import {
   FaClockRotateLeft,
   FaCircleXmark,
   FaUserPen,
+  FaRotateRight,
 } from 'react-icons/fa6';
 import { FiSave } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader.jsx';
 import { useUserAuth } from '../contexts/UserAuthContext.jsx';
 import userApi from '../api/userClient.js';
+import { formatPrice } from '../lib/format.js';
 import useSEO from '../hooks/useSEO.js';
 
 const SUB_LABEL = {
@@ -30,9 +32,17 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function daysRemaining(expiresAt) {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+}
+
 export default function AccountPage() {
   useSEO({ title: 'My Account', description: 'Manage your Denis Ndayishimiye account.' });
-  const { isAuthenticated, loading, profile, subscription, logout, changePassword, refreshProfile } = useUserAuth();
+  const { isAuthenticated, loading, profileLoading, profileError, profile, subscription, logout, changePassword, refreshProfile } =
+    useUserAuth();
   const navigateTo = null;
 
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
@@ -47,7 +57,7 @@ export default function AccountPage() {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
 
-  if (loading) return null;
+  if (loading || (isAuthenticated && profileLoading)) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const subMeta = SUB_LABEL[subscription.status] || SUB_LABEL.inactive;
@@ -137,18 +147,68 @@ export default function AccountPage() {
                     </span>
                   </dd>
                 </div>
-                {subscription.expires_at && (
+                {subscription.status === 'active' && (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500 dark:text-slate-400">Plan</dt>
+                      <dd className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                        <FaCrown className="h-3.5 w-3.5 text-gold" /> Premium
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500 dark:text-slate-400">Started</dt>
+                      <dd className="font-semibold text-slate-800 dark:text-slate-200">{formatDate(subscription.started_at)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500 dark:text-slate-400">Expires</dt>
+                      <dd className="font-semibold text-slate-800 dark:text-slate-200">{formatDate(subscription.expires_at)}</dd>
+                    </div>
+                    {daysRemaining(subscription.expires_at) !== null && (
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Days remaining</dt>
+                        <dd className="font-semibold text-slate-800 dark:text-slate-200">
+                          {daysRemaining(subscription.expires_at)}
+                        </dd>
+                      </div>
+                    )}
+                    {Number(subscription.amount) > 0 && (
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Paid</dt>
+                        <dd className="font-semibold text-slate-800 dark:text-slate-200">
+                          {formatPrice(subscription.amount, subscription.currency || 'RWF')}
+                        </dd>
+                      </div>
+                    )}
+                  </>
+                )}
+                {subscription.status === 'expired' && subscription.expires_at && (
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-slate-500 dark:text-slate-400">Subscription expires</dt>
+                    <dt className="text-slate-500 dark:text-slate-400">Expired on</dt>
                     <dd className="font-semibold text-slate-800 dark:text-slate-200">{formatDate(subscription.expires_at)}</dd>
                   </div>
                 )}
               </dl>
 
+              {profileError && (
+                <p className="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
+                  Could not load your subscription details. Please try again later.
+                </p>
+              )}
+
               <div className="mt-6 space-y-2">
                 <Link to="/subscribe" className="btn-primary w-full">
-                  <FaCrown className="h-4 w-4" />
-                  {subscription.status === 'active' ? 'Manage Subscription' : 'Subscribe'}
+                  {subscription.status === 'expired' || subscription.status === 'inactive' || subscription.status === 'cancelled' ? (
+                    <FaRotateRight className="h-4 w-4" />
+                  ) : (
+                    <FaCrown className="h-4 w-4" />
+                  )}
+                  {subscription.status === 'active'
+                    ? 'Manage Subscription'
+                    : subscription.status === 'expired'
+                      ? 'Renew Subscription'
+                      : subscription.status === 'pending'
+                        ? 'View Status'
+                        : 'Subscribe'}
                 </Link>
                 <button type="button" onClick={logout} className="btn-outline w-full border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10">
                   <FaRightFromBracket className="h-4 w-4" /> Logout
